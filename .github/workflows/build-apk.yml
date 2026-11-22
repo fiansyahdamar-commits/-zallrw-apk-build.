@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   rebuild-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -227,6 +227,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
+          disable-linux-hw-accel: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
             set -euo pipefail
             adb install work/ZallRW-TEST-ONLY.apk
