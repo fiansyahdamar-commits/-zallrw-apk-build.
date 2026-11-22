@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "source/**"
+      - "source.part-*"
       - ".github/workflows/build-apk.yml"
 
 permissions:
@@ -18,15 +18,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check source archive
+      - name: Reassemble and check source archive
         shell: bash
         run: |
           set -euo pipefail
-          test -f source/Zall_RW_src_patched.zip || {
-            echo "::error::Missing source/Zall_RW_src_patched.zip. Add the original Zall RW Apktool source archive first."
-            exit 1
-          }
-          unzip -t source/Zall_RW_src_patched.zip
+          for i in $(seq -w 0 18); do
+            part="source.part-${i}"
+            test -s "$part" || {
+              echo "::error::Missing source archive part: $part"
+              exit 1
+            }
+          done
+          cat $(printf 'source.part-%02d ' $(seq 0 18)) > Zall_RW_src_patched.zip
+          unzip -tq Zall_RW_src_patched.zip
+          echo "Source archive assembled and ZIP integrity passed."
 
       - name: Install build tools
         run: |
@@ -36,7 +41,7 @@ jobs:
       - name: Extract source
         run: |
           mkdir -p work
-          unzip -q source/Zall_RW_src_patched.zip -d work
+          unzip -q Zall_RW_src_patched.zip -d work
           MANIFEST="$(find work -name AndroidManifest.xml -type f -print -quit)"
           test -n "$MANIFEST"
           echo "PROJECT_DIR=$(dirname "$MANIFEST")" >> "$GITHUB_ENV"
