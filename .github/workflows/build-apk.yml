@@ -270,25 +270,30 @@ jobs:
             adb shell pidof com.zallrwv4.app > work/app-pid-initial.txt
             test -s work/app-pid-initial.txt
             initial_pid="$(tr -d '\r\n' < work/app-pid-initial.txt)"
+            test -n "$initial_pid"
             echo "Initial app PID: $initial_pid"
             sleep 10
             adb shell pidof com.zallrwv4.app > work/app-pid-current.txt
             current_pid="$(tr -d '\r\n' < work/app-pid-current.txt)"
+            test -n "$current_pid"
             test "$current_pid" = "$initial_pid"
             echo "checkpoint 18s: PID $current_pid"
             sleep 10
             adb shell pidof com.zallrwv4.app > work/app-pid-current.txt
             current_pid="$(tr -d '\r\n' < work/app-pid-current.txt)"
+            test -n "$current_pid"
             test "$current_pid" = "$initial_pid"
             echo "checkpoint 28s: PID $current_pid"
             sleep 10
             adb shell pidof com.zallrwv4.app > work/app-pid-current.txt
             current_pid="$(tr -d '\r\n' < work/app-pid-current.txt)"
+            test -n "$current_pid"
             test "$current_pid" = "$initial_pid"
             echo "checkpoint 38s: PID $current_pid"
             sleep 10
             adb shell pidof com.zallrwv4.app > work/app-pid-current.txt
             current_pid="$(tr -d '\r\n' < work/app-pid-current.txt)"
+            test -n "$current_pid"
             test "$current_pid" = "$initial_pid"
             echo "EMULATOR_STARTUP=PASS: same process survived 48 seconds" | tee work/emulator-result.txt
             adb logcat -d -t 5000 > work/startup-logcat.txt
