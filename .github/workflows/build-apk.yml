@@ -55,7 +55,8 @@ jobs:
           echo "=== Apktool ==="
           apktool --version
           echo "=== largest Smali files ==="
-          find smali smali_classes* -type f -name '*.smali' -printf '%s %p\n' 2>/dev/null | sort -nr | head -20
+          find smali smali_classes* -type f -name '*.smali' -printf '%s %p\\n' 2>/dev/null | sort -nr > ../largest-smali-files.txt
+          head -20 ../largest-smali-files.txt
           echo "=== source counts ==="
           find smali smali_classes* -type f -name '*.smali' 2>/dev/null | wc -l
           python3 - <<'PY'
@@ -100,5 +101,6 @@ jobs:
           path: |
             work/build-result.txt
             work/ZallRW-rebuild-test-unsigned.apk
+            work/largest-smali-files.txt
           if-no-files-found: warn
           retention-days: 7
