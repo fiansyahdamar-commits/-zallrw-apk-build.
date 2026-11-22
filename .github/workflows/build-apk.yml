@@ -131,7 +131,7 @@ jobs:
           print("REDEEM_PASSWORD_PATCH=PASS")
           PY
           grep -q 'functions/v1/admin-api-v2/redeem' "smali_classes2/z/du0.smali"
-          test "$(grep -c '"password"' "work/Zall RW_src/smali_classes2/z/du0.smali")" -eq 2
+          test "$(grep -c '"password"' "smali_classes2/z/du0.smali")" -eq 2
           grep -q 'CODE|PASSWORD' "smali/z/b4.smali"
 
           echo "=== metadata conversion ==="
