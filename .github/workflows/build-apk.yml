@@ -266,7 +266,8 @@ jobs:
             adb install work/ZallRW-TEST-ONLY.apk
             adb shell monkey -p com.zallrwv4.app 1
             sleep 25
-            if ! adb shell pidof com.zallrwv4.app >/dev/null; then
+            adb shell pidof com.zallrwv4.app > work/app-pid.txt || true
+            if test ! -s work/app-pid.txt; then
               echo "EMULATOR_STARTUP=FAIL" | tee work/emulator-result.txt
               adb logcat -d -t 2500 > work/startup-logcat.txt
               exit 1
