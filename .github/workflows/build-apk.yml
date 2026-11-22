@@ -84,7 +84,7 @@ jobs:
           assert s.count(old_url) == 1, "Expected exactly one old redeem endpoint"
           s = s.replace(old_url, new_url, 1)
 
-          parse_anchor = '    iget-object v11, v0, Lz/du0;->j:Ljava/lang/String;\\n'
+          parse_anchor = '    iget-object v11, v0, Lz/du0;->j:Ljava/lang/String;\n'
           assert s.count(parse_anchor) == 1, "Could not locate redeem input register"
 
           # Reserve v16-v19 in this method. Increasing .locals preserves all existing v-registers.
@@ -92,12 +92,12 @@ jobs:
           method_end = s.index(".end method", method_start)
           method = s[method_start:method_end]
           import re
-          locals_match = re.search(r"(?m)^(\\s*)\\.locals\\s+(\\d+)\\s*$", method)
+          locals_match = re.search(r"(?m)^(\s*)\.locals\s+(\d+)\s*$", method)
           if locals_match:
               current = int(locals_match.group(2))
               method = method[:locals_match.start(2)] + str(max(current, 20)) + method[locals_match.end(2):]
           else:
-              regs_match = re.search(r"(?m)^(\\s*)\\.registers\\s+(\\d+)\\s*$", method)
+              regs_match = re.search(r"(?m)^(\s*)\.registers\s+(\d+)\s*$", method)
               assert regs_match, "Redeem method has no .locals or .registers directive"
               current = int(regs_match.group(2))
               # The constructor/coroutine method has at most 8 parameter words; reserve 20 locals.
