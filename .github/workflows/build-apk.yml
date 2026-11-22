@@ -220,6 +220,27 @@ jobs:
           ls -lh ZallRW-TEST-ONLY.apk
 
 
+      - name: Smoke-test signed APK in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            adb install work/ZallRW-TEST-ONLY.apk
+            adb shell monkey -p com.zallrwv4.app 1
+            sleep 25
+            if ! adb shell pidof com.zallrwv4.app >/dev/null; then
+              echo "EMULATOR_STARTUP=FAIL" | tee work/emulator-result.txt
+              adb logcat -d -t 2500 > work/startup-logcat.txt
+              exit 1
+            fi
+            echo "EMULATOR_STARTUP=PASS" | tee work/emulator-result.txt
+            adb logcat -d -t 2500 > work/startup-logcat.txt
+
+
       - name: Upload rebuild test
         if: always()
         uses: actions/upload-artifact@v4
@@ -230,5 +251,7 @@ jobs:
             work/ZallRW-rebuild-test-unsigned.apk
             work/ZallRW-TEST-ONLY.apk
             work/signing-result.txt
+            work/emulator-result.txt
+            work/startup-logcat.txt
           if-no-files-found: warn
           retention-days: 7
