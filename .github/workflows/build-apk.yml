@@ -35,10 +35,14 @@ jobs:
       - name: Convert metadata and attempt rebuild
         shell: bash
         env:
-          JAVA_OPTS: "-Xms1g -Xmx8g -XX:MaxMetaspaceSize=1g"
+          JAVA_TOOL_OPTIONS: "-Xms512m -Xmx5g -XX:MaxMetaspaceSize=768m"
         run: |
           set -euo pipefail
           cd "work/Zall RW_src"
+          echo "=== runner memory ==="
+          free -h
+          echo "=== effective Java options ==="
+          java -XshowSettings:vm -version 2>&1 | grep -E 'Max. Heap|Picked up|openjdk version' || true
           echo "=== manifest package and SDK ==="
           grep -oE 'package="[^"]+"|android:(minSdkVersion|targetSdkVersion)="[^"]+"' AndroidManifest.xml | head -20 || true
           echo "=== installed Apktool ==="
@@ -69,10 +73,8 @@ jobs:
               "doNotCompress": src.get("doNotCompress", [])
           }
           Path("apktool.yml").write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
-          print(Path("apktool.yml").read_text()[:12000])
+          print("apktool.yml generated")
           PY
-          echo "=== Java memory ==="
-          java -XshowSettings:vm -version 2>&1 | head -12
           apktool b . -o ../ZallRW-rebuild-test-unsigned.apk
           test -s ../ZallRW-rebuild-test-unsigned.apk
           unzip -tq ../ZallRW-rebuild-test-unsigned.apk
