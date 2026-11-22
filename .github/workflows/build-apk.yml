@@ -11,12 +11,18 @@ permissions:
   contents: read
 
 jobs:
-  inspect-source:
+  rebuild-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Reassemble source
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apktool zipalign apksigner
+
+      - name: Reassemble source archive
         shell: bash
         run: |
           set -euo pipefail
@@ -25,21 +31,57 @@ jobs:
           unzip -tq Zall_RW_src_patched.zip
           mkdir work
           unzip -q Zall_RW_src_patched.zip -d work
-      - name: Diagnose metadata needed for safe rebuild
+
+      - name: Convert metadata and attempt rebuild
         shell: bash
         run: |
           set -euo pipefail
           cd "work/Zall RW_src"
-          echo "=== apktool.json ==="
-          cat apktool.json
-          echo
-          echo "=== project directories ==="
-          find . -maxdepth 2 -type d | sort | head -120
-          echo "=== original directory ==="
-          find original -maxdepth 2 -type f -printf '%p (%s bytes)\n' | head -80
-          echo "=== resources and smali counts ==="
-          find res -type f | wc -l
-          find smali smali_classes2 -type f -name '*.smali' | wc -l
-          echo "=== metadata files ==="
-          find .. -maxdepth 3 -type f \( -name 'apktool.yml' -o -name 'apktool.yaml' -o -name 'apktool.json' \) -print
-          echo "Diagnostic completed. No APK is produced in this inspection run."
+          echo "=== manifest package and SDK ==="
+          grep -oE 'package="[^"]+"|android:(minSdkVersion|targetSdkVersion)="[^"]+"' AndroidManifest.xml | head -20 || true
+          echo "=== installed Apktool ==="
+          apktool --version
+          python3 - <<'PY'
+          import json, yaml
+          from pathlib import Path
+          src = json.loads(Path("apktool.json").read_text())
+          pkg = src.get("PackageInfo", {})
+          vi = src.get("VersionInfo", {})
+          fw = src.get("UsesFramework", {})
+          data = {
+              "version": "2.9.3",
+              "apkFileName": src.get("apkFileName", "Zall RW_src.apk"),
+              "isFrameworkApk": False,
+              "usesFramework": {"ids": fw.get("ids", [1])},
+              "packageInfo": {
+                  "forcedPackageId": format(int(pkg.get("forcedPackageId", "127")), "x"),
+                  "renameManifestPackage": pkg.get("renameManifestPackage")
+              },
+              "versionInfo": {
+                  "versionCode": str(vi.get("versionCode", "19")),
+                  "versionName": str(vi.get("versionName", "5.5"))
+              },
+              "sharedLibrary": bool(src.get("sharedLibrary", False)),
+              "sparseResources": bool(src.get("sparseResources", False)),
+              "unknownFiles": src.get("unknownFiles", {}),
+              "doNotCompress": src.get("doNotCompress", [])
+          }
+          Path("apktool.yml").write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
+          print(Path("apktool.yml").read_text()[:12000])
+          PY
+          apktool b . -o ../ZallRW-rebuild-test-unsigned.apk
+          test -s ../ZallRW-rebuild-test-unsigned.apk
+          unzip -tq ../ZallRW-rebuild-test-unsigned.apk
+          echo "APKTOOL_BUILD=PASS" | tee ../build-result.txt
+          ls -lh ../ZallRW-rebuild-test-unsigned.apk
+
+      - name: Upload rebuild test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZallRW-REBUILD-TEST-DIAGNOSTICS
+          path: |
+            work/build-result.txt
+            work/ZallRW-rebuild-test-unsigned.apk
+          if-no-files-found: warn
+          retention-days: 7
