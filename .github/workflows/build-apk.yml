@@ -150,6 +150,22 @@ jobs:
           new_help = "Enter code and password separated by | (CODE|PASSWORD)."
           assert ui.count(old_help) == 1, "Redeem helper text not found uniquely"
           ui_file.write_text(ui.replace(old_help, new_help, 1))
+
+          # Ensure Android extracts bundled native libraries during installation.
+          manifest_file = root / "AndroidManifest.xml"
+          manifest = manifest_file.read_text()
+          import re
+          app_match = re.search(r"<application\b[^>]*", manifest)
+          assert app_match, "Android application manifest element not found"
+          app_tag = app_match.group(0)
+          if "android:extractNativeLibs=" in app_tag:
+              app_tag = re.sub(r'android:extractNativeLibs="[^"]*"', 'android:extractNativeLibs="true"', app_tag)
+          else:
+              app_tag = app_tag[:-1] + ' android:extractNativeLibs="true"'
+          manifest = manifest[:app_match.start()] + app_tag + manifest[app_match.end():]
+          manifest_file.write_text(manifest)
+          print("NATIVE_LIBRARY_EXTRACTION=true")
+
           print("REDEEM_PASSWORD_PATCH=PASS")
           PY
           grep -q 'functions/v1/admin-api-v2/redeem' "smali_classes2/z/du0.smali"
