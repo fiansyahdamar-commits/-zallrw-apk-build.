@@ -50,15 +50,11 @@ jobs:
           cd "work/Zall RW_src"
           echo "=== runner memory ==="
           free -h
-          echo "=== Java heap ==="
-          java -XshowSettings:vm -version 2>&1 | grep -E 'Max. Heap|Picked up|openjdk version' || true
           echo "=== Apktool ==="
           apktool --version
-          echo "=== largest Smali files ==="
-          find smali smali_classes* -type f -name '*.smali' -printf '%s %p\\n' 2>/dev/null | sort -nr > ../largest-smali-files.txt
-          head -20 ../largest-smali-files.txt
-          echo "=== source counts ==="
-          find smali smali_classes* -type f -name '*.smali' 2>/dev/null | wc -l
+          echo "=== suspect Smali file ==="
+          sed -n '1,50p' smali_classes2/z/bu0.smali || true
+          echo "=== metadata conversion ==="
           python3 - <<'PY'
           import json, yaml
           from pathlib import Path
@@ -72,7 +68,7 @@ jobs:
               "isFrameworkApk": False,
               "usesFramework": {"ids": fw.get("ids", [1])},
               "packageInfo": {
-                  "forcedPackageId": format(int(pkg.get("forcedPackageId", "127")), "x"),
+                  "forcedPackageId": str(int(pkg.get("forcedPackageId", "127"))),
                   "renameManifestPackage": pkg.get("renameManifestPackage")
               },
               "versionInfo": {
@@ -85,7 +81,7 @@ jobs:
               "doNotCompress": src.get("doNotCompress", [])
           }
           Path("apktool.yml").write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
-          print("apktool.yml generated")
+          print("apktool.yml generated with decimal package ID")
           PY
           apktool b . -o ../ZallRW-rebuild-test-unsigned.apk
           test -s ../ZallRW-rebuild-test-unsigned.apk
@@ -101,6 +97,5 @@ jobs:
           path: |
             work/build-result.txt
             work/ZallRW-rebuild-test-unsigned.apk
-            work/largest-smali-files.txt
           if-no-files-found: warn
           retention-days: 7
