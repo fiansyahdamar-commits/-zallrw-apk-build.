@@ -155,6 +155,19 @@ jobs:
           manifest_file = root / "AndroidManifest.xml"
           manifest = manifest_file.read_text()
           import re
+          # Android 14+ rejects APKs without a declared target SDK.
+          uses_sdk = re.search(r"<uses-sdk\b[^>]*/?>", manifest)
+          if uses_sdk:
+              sdk_tag = uses_sdk.group(0)
+              if re.search(r'android:targetSdkVersion="[^"]*"', sdk_tag):
+                  sdk_tag = re.sub(r'android:targetSdkVersion="[^"]*"', 'android:targetSdkVersion="28"', sdk_tag)
+              else:
+                  sdk_tag = sdk_tag[:-1] + ' android:targetSdkVersion="28"' + ('>' if sdk_tag.endswith('>') else '')
+              manifest = manifest[:uses_sdk.start()] + sdk_tag + manifest[uses_sdk.end():]
+          else:
+              manifest_match = re.search(r"<manifest\b[^>]*>", manifest)
+              assert manifest_match, "Android manifest root element not found"
+              manifest = manifest[:manifest_match.end()] + '\n    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="28" />' + manifest[manifest_match.end():]
           app_match = re.search(r"<application\b[^>]*", manifest)
           assert app_match, "Android application manifest element not found"
           app_tag = app_match.group(0)
@@ -165,6 +178,7 @@ jobs:
           manifest = manifest[:app_match.start()] + app_tag + manifest[app_match.end():]
           manifest_file.write_text(manifest)
           print("NATIVE_LIBRARY_EXTRACTION=true")
+          print("ANDROID_TARGET_SDK=28")
 
           print("REDEEM_PASSWORD_PATCH=PASS")
           PY
