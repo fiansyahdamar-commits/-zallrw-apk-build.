@@ -41,7 +41,7 @@ jobs:
           mkdir work
           unzip -q Zall_RW_src_patched.zip -d work
 
-      - name: Inspect source and attempt rebuild
+      - name: Normalize decompiled source and rebuild
         shell: bash
         env:
           JAVA_TOOL_OPTIONS: "-Xmx10g -XX:MaxMetaspaceSize=1g"
@@ -52,8 +52,24 @@ jobs:
           free -h
           echo "=== Apktool ==="
           apktool --version
-          echo "=== suspect Smali file ==="
-          sed -n '1,50p' smali_classes2/z/bu0.smali || true
+
+          echo "=== remove non-Smali section labels emitted by the decompiler ==="
+          find smali smali_classes* -type f -name '*.smali' -print0 | \
+            xargs -0 sed -i -E '/^(interfaces|virtual methods|direct methods|static fields|instance fields|direct fields|virtual fields)[[:space:]]*$/d'
+
+          echo "=== fix adaptive icon resource qualifier ==="
+          if [ -d res/mipmap-anydpi ]; then
+            mkdir -p res/mipmap-anydpi-v26
+            find res/mipmap-anydpi -maxdepth 1 -type f -exec mv -t res/mipmap-anydpi-v26 {} +
+            rmdir res/mipmap-anydpi
+          fi
+
+          echo "=== verify known malformed Smali headings are gone ==="
+          if grep -R -n -E '^(interfaces|virtual methods|direct methods|static fields|instance fields|direct fields|virtual fields)[[:space:]]*$' smali smali_classes* --include='*.smali'; then
+            echo "Unexpected decompiler labels remain"
+            exit 1
+          fi
+
           echo "=== metadata conversion ==="
           python3 - <<'PY'
           import json, yaml
@@ -83,6 +99,7 @@ jobs:
           Path("apktool.yml").write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
           print("apktool.yml generated with decimal package ID")
           PY
+
           apktool b . -o ../ZallRW-rebuild-test-unsigned.apk
           test -s ../ZallRW-rebuild-test-unsigned.apk
           unzip -tq ../ZallRW-rebuild-test-unsigned.apk
