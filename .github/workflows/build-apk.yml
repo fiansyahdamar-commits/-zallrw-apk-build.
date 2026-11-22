@@ -13,7 +13,7 @@ permissions:
 jobs:
   rebuild-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +34,8 @@ jobs:
 
       - name: Convert metadata and attempt rebuild
         shell: bash
+        env:
+          JAVA_OPTS: "-Xms1g -Xmx8g -XX:MaxMetaspaceSize=1g"
         run: |
           set -euo pipefail
           cd "work/Zall RW_src"
@@ -69,6 +71,8 @@ jobs:
           Path("apktool.yml").write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
           print(Path("apktool.yml").read_text()[:12000])
           PY
+          echo "=== Java memory ==="
+          java -XshowSettings:vm -version 2>&1 | head -12
           apktool b . -o ../ZallRW-rebuild-test-unsigned.apk
           test -s ../ZallRW-rebuild-test-unsigned.apk
           unzip -tq ../ZallRW-rebuild-test-unsigned.apk
