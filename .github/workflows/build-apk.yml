@@ -70,6 +70,70 @@ jobs:
             exit 1
           fi
 
+          echo "=== patch redeem password request without changing backend or app state ==="
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("work/Zall RW_src")
+          request_file = root / "smali_classes2/z/du0.smali"
+          ui_file = root / "smali/z/b4.smali"
+          s = request_file.read_text()
+
+          old_url = "https://zallrw-vip-backend-63rdvpmns-kedu065-maker.vercel.app/api/redeem"
+          new_url = "https://nvxgpmbakbzjyfjstdwl.supabase.co/functions/v1/admin-api-v2/redeem"
+          assert s.count(old_url) == 1, "Expected exactly one old redeem endpoint"
+          s = s.replace(old_url, new_url, 1)
+
+          parse_anchor = '    iget-object v11, v0, Lz/du0;->j:Ljava/lang/String;\n'
+          parse_block = '''    iget-object v11, v0, Lz/du0;->j:Ljava/lang/String;
+          
+              # Parse the existing input as CODE|PASSWORD; preserve deviceId in field i.
+              move-object/from16 v19, v11
+              const-string v18, "|"
+              invoke-virtual {v19, v18}, Ljava/lang/String;->indexOf(Ljava/lang/String;)I
+              move-result v18
+              if-ltz v18, :no_redeem_password
+              const/4 v17, 0x0
+              invoke-virtual {v19, v17, v18}, Ljava/lang/String;->substring(II)Ljava/lang/String;
+              move-result-object v11
+              add-int/lit8 v18, v18, 0x1
+              invoke-virtual {v19, v18}, Ljava/lang/String;->substring(I)Ljava/lang/String;
+              move-result-object v16
+              goto :redeem_password_parsed
+          :no_redeem_password
+              const-string v16, ""
+          :redeem_password_parsed
+          '''
+          assert s.count(parse_anchor) == 1, "Could not locate redeem input register"
+          s = s.replace(parse_anchor, parse_block, 1)
+
+          first_put = '    invoke-virtual {v12, v10, v3}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;\n'
+          first_add = first_put + '''    const-string v18, "password"
+              invoke-virtual {v12, v18, v16}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
+          '''
+          assert s.count(first_put) == 1, "Initial JSON code field not found uniquely"
+          s = s.replace(first_put, first_add, 1)
+
+          retry_put = '    invoke-virtual {v2, v10, v3}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;\n'
+          retry_add = retry_put + '''    const-string v18, "password"
+              invoke-virtual {v2, v18, v16}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
+          '''
+          assert s.count(retry_put) == 1, "Retry JSON code field not found uniquely"
+          s = s.replace(retry_put, retry_add, 1)
+          assert s.count(new_url) == 1 and s.count('"password"') == 2
+          request_file.write_text(s)
+
+          ui = ui_file.read_text()
+          old_help = "Enter your VIP activation code below to upgrade your account instantly."
+          new_help = "Enter code and password separated by | (CODE|PASSWORD)."
+          assert ui.count(old_help) == 1, "Redeem helper text not found uniquely"
+          ui_file.write_text(ui.replace(old_help, new_help, 1))
+          print("REDEEM_PASSWORD_PATCH=PASS")
+          PY
+          grep -q 'functions/v1/admin-api-v2/redeem' "work/Zall RW_src/smali_classes2/z/du0.smali"
+          test "$(grep -c '"password"' "work/Zall RW_src/smali_classes2/z/du0.smali")" -eq 2
+          grep -q 'CODE|PASSWORD' "work/Zall RW_src/smali/z/b4.smali"
+
           echo "=== metadata conversion ==="
           python3 - <<'PY'
           import json, yaml
