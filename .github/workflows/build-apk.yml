@@ -192,6 +192,34 @@ jobs:
           echo "APKTOOL_BUILD=PASS" | tee ../build-result.txt
           ls -lh ../ZallRW-rebuild-test-unsigned.apk
 
+      - name: Sign isolated test APK and verify signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd work
+          # This throwaway key is for isolated testing only; it is not the legacy release key.
+          TEST_STORE_PASS="$(openssl rand -hex 24)"
+          keytool -genkeypair -v \
+            -keystore zallrw-test-only.jks \
+            -storepass "$TEST_STORE_PASS" \
+            -keypass "$TEST_STORE_PASS" \
+            -alias zallrw-test-only \
+            -keyalg RSA -keysize 2048 -validity 30 \
+            -dname "CN=Zall RW Test Only, OU=QA, O=Zall RW, C=ID" >/dev/null 2>&1
+          zipalign -f 4 ZallRW-rebuild-test-unsigned.apk ZallRW-test-aligned.apk
+          apksigner sign \
+            --ks zallrw-test-only.jks \
+            --ks-key-alias zallrw-test-only \
+            --ks-pass "pass:$TEST_STORE_PASS" \
+            --key-pass "pass:$TEST_STORE_PASS" \
+            --out ZallRW-TEST-ONLY.apk ZallRW-test-aligned.apk
+          apksigner verify --verbose --print-certs ZallRW-TEST-ONLY.apk | tee signing-result.txt
+          grep -q "Verifies" signing-result.txt
+          echo "TEST_APK_SIGNATURE=PASS" >> build-result.txt
+          rm -f zallrw-test-only.jks ZallRW-test-aligned.apk
+          ls -lh ZallRW-TEST-ONLY.apk
+
+
       - name: Upload rebuild test
         if: always()
         uses: actions/upload-artifact@v4
@@ -200,5 +228,7 @@ jobs:
           path: |
             work/build-result.txt
             work/ZallRW-rebuild-test-unsigned.apk
+            work/ZallRW-TEST-ONLY.apk
+            work/signing-result.txt
           if-no-files-found: warn
           retention-days: 7
