@@ -11,54 +11,35 @@ permissions:
   contents: read
 
 jobs:
-  inspect-and-build:
+  inspect-source:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Reassemble and check source archive
+      - uses: actions/checkout@v4
+      - name: Reassemble source
         shell: bash
         run: |
           set -euo pipefail
-          for i in $(seq -w 0 18); do
-            test -s "source.part-${i}" || { echo "::error::Missing source.part-${i}"; exit 1; }
-          done
+          for i in $(seq -w 0 18); do test -s "source.part-${i}"; done
           cat $(printf 'source.part-%02d ' $(seq 0 18)) > Zall_RW_src_patched.zip
           unzip -tq Zall_RW_src_patched.zip
-          echo "Archive integrity: PASS"
-          echo "Archive size: $(du -h Zall_RW_src_patched.zip | cut -f1)"
-      - name: Install build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y apktool unzip zip openjdk-17-jdk
-      - name: Inspect archive structure and locate Apktool project
+          mkdir work
+          unzip -q Zall_RW_src_patched.zip -d work
+      - name: Diagnose metadata needed for safe rebuild
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p work
-          unzip -q Zall_RW_src_patched.zip -d work
-          echo "=== TOP LEVEL ==="
-          find work -mindepth 1 -maxdepth 2 -printf '%y %p\n' | head -200
-          echo "=== APKTOOL PROJECTS ==="
-          find work -type f -name apktool.yml -print
-          echo "=== MANIFESTS ==="
-          find work -type f -name AndroidManifest.xml -print | head -100
-          PROJECT_YML="$(find work -type f -name apktool.yml -print -quit)"
-          if [ -z "$PROJECT_YML" ]; then
-            echo "::error::Archive contains no apktool.yml. It is not a complete Apktool decompilation project; cannot safely rebuild."
-            exit 1
-          fi
-          echo "PROJECT_DIR=$(dirname "$PROJECT_YML")" >> "$GITHUB_ENV"
-      - name: Build unsigned APK
-        run: |
-          set -euo pipefail
-          apktool b "$PROJECT_DIR" -f -o "$GITHUB_WORKSPACE/ZallRW-unsigned.apk"
-          test -s "$GITHUB_WORKSPACE/ZallRW-unsigned.apk"
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ZallRW-UNSIGNED
-          path: ZallRW-unsigned.apk
-          if-no-files-found: error
-          retention-days: 7
+          cd "work/Zall RW_src"
+          echo "=== apktool.json ==="
+          cat apktool.json
+          echo
+          echo "=== project directories ==="
+          find . -maxdepth 2 -type d | sort | head -120
+          echo "=== original directory ==="
+          find original -maxdepth 2 -type f -printf '%p (%s bytes)\n' | head -80
+          echo "=== resources and smali counts ==="
+          find res -type f | wc -l
+          find smali smali_classes2 -type f -name '*.smali' | wc -l
+          echo "=== metadata files ==="
+          find .. -maxdepth 3 -type f \( -name 'apktool.yml' -o -name 'apktool.yaml' -o -name 'apktool.json' \) -print
+          echo "Diagnostic completed. No APK is produced in this inspection run."
