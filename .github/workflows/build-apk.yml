@@ -232,7 +232,7 @@ jobs:
           disable-linux-hw-accel: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            set -euo pipefail
+            set -eu
             adb install work/ZallRW-TEST-ONLY.apk
             adb shell monkey -p com.zallrwv4.app 1
             sleep 25
