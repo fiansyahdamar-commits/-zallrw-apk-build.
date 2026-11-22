@@ -35,13 +35,13 @@ jobs:
       - name: Convert metadata and attempt rebuild
         shell: bash
         env:
-          JAVA_TOOL_OPTIONS: "-Xms1g -Xmx10g -XX:MaxMetaspaceSize=1g"
+          JAVA_TOOL_OPTIONS: "-Xmx10g -XX:MaxMetaspaceSize=1g"
         run: |
           set -euo pipefail
           cd "work/Zall RW_src"
           echo "=== runner memory ==="
           free -h
-          echo "=== effective Java options (10 GB heap) ==="
+          echo "=== effective Java options (10 GB max heap, default initial heap) ==="
           java -XshowSettings:vm -version 2>&1 | grep -E 'Max. Heap|Picked up|openjdk version' || true
           echo "=== manifest package and SDK ==="
           grep -oE 'package="[^"]+"|android:(minSdkVersion|targetSdkVersion)="[^"]+"' AndroidManifest.xml | head -20 || true
