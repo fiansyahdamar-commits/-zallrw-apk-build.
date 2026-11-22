@@ -267,11 +267,7 @@ jobs:
             adb shell monkey -p com.zallrwv4.app 1
             sleep 25
             adb shell pidof com.zallrwv4.app > work/app-pid.txt || true
-            if test ! -s work/app-pid.txt; then
-              echo "EMULATOR_STARTUP=FAIL" | tee work/emulator-result.txt
-              adb logcat -d -t 2500 > work/startup-logcat.txt
-              exit 1
-            fi
+            test -s work/app-pid.txt || { echo "EMULATOR_STARTUP=FAIL" | tee work/emulator-result.txt; adb logcat -d -t 2500 > work/startup-logcat.txt; exit 1; }
             echo "EMULATOR_STARTUP=PASS" | tee work/emulator-result.txt
             adb logcat -d -t 2500 > work/startup-logcat.txt
 
