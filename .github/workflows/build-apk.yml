@@ -20,7 +20,16 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y apktool zipalign apksigner
+          sudo apt-get install -y zipalign apksigner curl unzip python3-yaml
+
+      - name: Install modern Apktool
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 "https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar" -o /usr/local/bin/apktool.jar
+          printf '#!/usr/bin/env bash\nexec java -jar /usr/local/bin/apktool.jar "$@"\n' | sudo tee /usr/local/bin/apktool >/dev/null
+          sudo chmod +x /usr/local/bin/apktool
+          apktool --version
 
       - name: Reassemble source archive
         shell: bash
@@ -32,7 +41,7 @@ jobs:
           mkdir work
           unzip -q Zall_RW_src_patched.zip -d work
 
-      - name: Convert metadata and attempt rebuild
+      - name: Inspect source and attempt rebuild
         shell: bash
         env:
           JAVA_TOOL_OPTIONS: "-Xmx10g -XX:MaxMetaspaceSize=1g"
@@ -41,12 +50,14 @@ jobs:
           cd "work/Zall RW_src"
           echo "=== runner memory ==="
           free -h
-          echo "=== effective Java options (10 GB max heap, default initial heap) ==="
+          echo "=== Java heap ==="
           java -XshowSettings:vm -version 2>&1 | grep -E 'Max. Heap|Picked up|openjdk version' || true
-          echo "=== manifest package and SDK ==="
-          grep -oE 'package="[^"]+"|android:(minSdkVersion|targetSdkVersion)="[^"]+"' AndroidManifest.xml | head -20 || true
-          echo "=== installed Apktool ==="
+          echo "=== Apktool ==="
           apktool --version
+          echo "=== largest Smali files ==="
+          find smali smali_classes* -type f -name '*.smali' -printf '%s %p\n' 2>/dev/null | sort -nr | head -20
+          echo "=== source counts ==="
+          find smali smali_classes* -type f -name '*.smali' 2>/dev/null | wc -l
           python3 - <<'PY'
           import json, yaml
           from pathlib import Path
