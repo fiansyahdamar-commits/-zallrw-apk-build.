@@ -84,39 +84,61 @@ jobs:
           assert s.count(old_url) == 1, "Expected exactly one old redeem endpoint"
           s = s.replace(old_url, new_url, 1)
 
-          parse_anchor = '    iget-object v11, v0, Lz/du0;->j:Ljava/lang/String;\n'
+          parse_anchor = '    iget-object v11, v0, Lz/du0;->j:Ljava/lang/String;\\n'
+          assert s.count(parse_anchor) == 1, "Could not locate redeem input register"
+
+          # Reserve v16-v19 in this method. Increasing .locals preserves all existing v-registers.
+          method_start = s.rfind(".method", 0, s.index(parse_anchor))
+          method_end = s.index(".end method", method_start)
+          method = s[method_start:method_end]
+          import re
+          locals_match = re.search(r"(?m)^(\\s*)\\.locals\\s+(\\d+)\\s*$", method)
+          if locals_match:
+              current = int(locals_match.group(2))
+              method = method[:locals_match.start(2)] + str(max(current, 20)) + method[locals_match.end(2):]
+          else:
+              regs_match = re.search(r"(?m)^(\\s*)\\.registers\\s+(\\d+)\\s*$", method)
+              assert regs_match, "Redeem method has no .locals or .registers directive"
+              current = int(regs_match.group(2))
+              # The constructor/coroutine method has at most 8 parameter words; reserve 20 locals.
+              method = method[:regs_match.start(2)] + str(max(current, 28)) + method[regs_match.end(2):]
+          s = s[:method_start] + method + s[method_end:]
+
           parse_block = '''    iget-object v11, v0, Lz/du0;->j:Ljava/lang/String;
-          
-              # Parse the existing input as CODE|PASSWORD; preserve deviceId in field i.
-              move-object/from16 v19, v11
-              const-string v18, "|"
-              invoke-virtual {v19, v18}, Ljava/lang/String;->indexOf(Ljava/lang/String;)I
+              # Parse CODE|PASSWORD with contiguous range registers.
+              move-object/from16 v17, v11
+              move-object/from16 v18, v17
+              const-string v19, "|"
+              invoke-virtual/range {v18 .. v19}, Ljava/lang/String;->indexOf(Ljava/lang/String;)I
               move-result v18
               if-ltz v18, :no_redeem_password
-              const/4 v17, 0x0
-              invoke-virtual {v19, v17, v18}, Ljava/lang/String;->substring(II)Ljava/lang/String;
+              move v19, v18
+              const/16 v18, 0x0
+              invoke-virtual/range {v17 .. v19}, Ljava/lang/String;->substring(II)Ljava/lang/String;
               move-result-object v11
-              add-int/lit8 v18, v18, 0x1
-              invoke-virtual {v19, v18}, Ljava/lang/String;->substring(I)Ljava/lang/String;
+              add-int/lit8 v19, v19, 0x1
+              move v18, v19
+              invoke-virtual/range {v17 .. v18}, Ljava/lang/String;->substring(I)Ljava/lang/String;
               move-result-object v16
               goto :redeem_password_parsed
           :no_redeem_password
               const-string v16, ""
           :redeem_password_parsed
           '''
-          assert s.count(parse_anchor) == 1, "Could not locate redeem input register"
           s = s.replace(parse_anchor, parse_block, 1)
 
           first_put = '    invoke-virtual {v12, v10, v3}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;\n'
-          first_add = first_put + '''    const-string v18, "password"
-              invoke-virtual {v12, v18, v16}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
+          first_add = first_put + '''    move-object/from16 v14, v16
+              const-string v15, "password"
+              invoke-virtual {v12, v15, v14}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
           '''
           assert s.count(first_put) == 1, "Initial JSON code field not found uniquely"
           s = s.replace(first_put, first_add, 1)
 
           retry_put = '    invoke-virtual {v2, v10, v3}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;\n'
-          retry_add = retry_put + '''    const-string v18, "password"
-              invoke-virtual {v2, v18, v16}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
+          retry_add = retry_put + '''    move-object/from16 v14, v16
+              const-string v15, "password"
+              invoke-virtual {v2, v15, v14}, Lorg/json/JSONObject;->put(Ljava/lang/String;Ljava/lang/Object;)Lorg/json/JSONObject;
           '''
           assert s.count(retry_put) == 1, "Retry JSON code field not found uniquely"
           s = s.replace(retry_put, retry_add, 1)
