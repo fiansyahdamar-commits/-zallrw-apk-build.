@@ -74,7 +74,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          root = Path("work/Zall RW_src")
+          root = Path(".")
           request_file = root / "smali_classes2/z/du0.smali"
           ui_file = root / "smali/z/b4.smali"
           s = request_file.read_text()
@@ -130,9 +130,9 @@ jobs:
           ui_file.write_text(ui.replace(old_help, new_help, 1))
           print("REDEEM_PASSWORD_PATCH=PASS")
           PY
-          grep -q 'functions/v1/admin-api-v2/redeem' "work/Zall RW_src/smali_classes2/z/du0.smali"
+          grep -q 'functions/v1/admin-api-v2/redeem' "smali_classes2/z/du0.smali"
           test "$(grep -c '"password"' "work/Zall RW_src/smali_classes2/z/du0.smali")" -eq 2
-          grep -q 'CODE|PASSWORD' "work/Zall RW_src/smali/z/b4.smali"
+          grep -q 'CODE|PASSWORD' "smali/z/b4.smali"
 
           echo "=== metadata conversion ==="
           python3 - <<'PY'
