@@ -289,16 +289,16 @@ jobs:
           OUT="../compose-diagnostics/compose-abi.txt"
           {
             echo "=== DrawScope class definition ==="
-            grep -R -n -B 3 -A 8 '^\\.class .*Landroidx/compose/ui/graphics/drawscope/DrawScope;' smali* --include='*.smali' || true
+            grep -R -n -B 3 -A 8 '^\.class .*Landroidx/compose/ui/graphics/drawscope/DrawScope;' smali* --include='*.smali' || true
             echo "=== DrawScope drawRect declarations and invocations ==="
             grep -R -n -B 8 -A 10 'drawRect-n-J9OG0' smali* --include='*.smali' || true
             echo "=== BackgroundNode class and draw implementation ==="
             grep -R -l 'BackgroundNode' smali* --include='*.smali' | while read -r f; do
               echo "--- $f ---"
-              grep -n -B 8 -A 14 -E '^\\.class|drawRect-n-J9OG0|DrawScope;->' "$f" || true
+              grep -n -B 8 -A 14 -E '^\.class|drawRect-n-J9OG0|DrawScope;->' "$f" || true
             done
             echo "=== duplicate DrawScope class definitions ==="
-            grep -R -l '^\\.class .*Landroidx/compose/ui/graphics/drawscope/DrawScope;' smali* --include='*.smali' || true
+            grep -R -l '^\.class .*Landroidx/compose/ui/graphics/drawscope/DrawScope;' smali* --include='*.smali' || true
           } > "$OUT"
           cat "$OUT"
 
