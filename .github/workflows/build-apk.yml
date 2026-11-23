@@ -178,14 +178,25 @@ jobs:
 
           # The app validates its own signing certificate at startup. Bind the CI-only
           # test APK to this run's temporary signer without changing the source archive.
-          integrity_file = root / "smali_classes2/z/c41.smali"
           expected_pin = "NzXW8cqbFRP2WXcG9sOywgAsFT+AISDgqH5gDne81JY="
           test_pin = os.environ.get("TEST_CERT_SHA_B64", "")
           assert test_pin, "Temporary test signer fingerprint was not prepared"
-          integrity = integrity_file.read_text()
-          assert integrity.count(expected_pin) == 1, "Original app signing fingerprint not found uniquely"
+          matches = []
+          for candidate in root.rglob("*.smali"):
+              try:
+                  content = candidate.read_text()
+              except (UnicodeDecodeError, OSError):
+                  continue
+              count = content.count(expected_pin)
+              if count:
+                  matches.append((candidate, content, count))
+          assert len(matches) == 1 and matches[0][2] == 1, (
+              "Expected one original signing fingerprint across Smali tree; "
+              f"found {[(str(p), n) for p, _, n in matches]}"
+          )
+          integrity_file, integrity, _ = matches[0]
           integrity_file.write_text(integrity.replace(expected_pin, test_pin, 1))
-          print("CI_ONLY_SIGNING_FINGERPRINT_PATCH=PASS")
+          print(f"CI_ONLY_SIGNING_FINGERPRINT_PATCH=PASS file={integrity_file}")
 
           # Ensure Android extracts bundled native libraries during installation.
           manifest_file = root / "AndroidManifest.xml"
