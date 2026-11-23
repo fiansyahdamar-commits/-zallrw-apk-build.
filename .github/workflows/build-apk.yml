@@ -255,7 +255,7 @@ jobs:
         env:
           ANDROID_I_WANT_MY_TCG: "yes"
         with:
-          api-level: 35
+          api-level: 30
           arch: x86_64
           profile: pixel_2
           disable-animations: true
