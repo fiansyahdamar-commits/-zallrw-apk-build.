@@ -250,6 +250,57 @@ jobs:
           ls -lh ZallRW-TEST-ONLY.apk
 
 
+      - name: Prepare emulator smoke-test script
+        shell: bash
+        run: |
+          mkdir -p work
+          cat > work/smoke-test.sh <<'SMOKE'
+          #!/usr/bin/env bash
+          set +e
+          mkdir -p work
+          adb install work/ZallRW-TEST-ONLY.apk
+          install_rc=$?
+          if [ "$install_rc" -ne 0 ]; then
+            echo "APK_INSTALL_FAILED=$install_rc" > work/emulator-result.txt
+            adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
+            exit 1
+          fi
+          adb logcat -c
+          adb shell monkey -p com.zallrwv4.app 1
+          sleep 8
+          adb shell pidof com.zallrwv4.app > work/app-pid-initial.txt 2>&1
+          pid_rc=$?
+          initial_pid=$(tr -d '\r\n' < work/app-pid-initial.txt)
+          if [ "$pid_rc" -ne 0 ] || [ -z "$initial_pid" ]; then
+            echo "APP_PID_MISSING_AFTER_LAUNCH" > work/emulator-result.txt
+            adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
+            grep -E -i 'FATAL EXCEPTION|AndroidRuntime|Fatal signal|am_crash|Process .* has died|Killing .*com.zallrwv4.app|Unable to start activity|ClassNotFoundException|NoClassDefFoundError' work/startup-logcat.txt > work/crash-summary.txt || true
+            adb shell dumpsys activity activities > work/activity-dump.txt 2>&1
+            adb shell dumpsys activity services > work/service-dump.txt 2>&1
+            exit 1
+          fi
+          checkpoint=18
+          while [ "$checkpoint" -le 48 ]; do
+            sleep 10
+            adb shell pidof com.zallrwv4.app > work/app-pid-current.txt 2>&1
+            current_pid=$(tr -d '\r\n' < work/app-pid-current.txt)
+            if [ -z "$current_pid" ] || [ "$current_pid" != "$initial_pid" ]; then
+              echo "APP_PROCESS_CHANGED_AT_SECONDS=$checkpoint initial=$initial_pid current=$current_pid" > work/emulator-result.txt
+              adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
+              grep -E -i 'FATAL EXCEPTION|AndroidRuntime|Fatal signal|am_crash|Process .* has died|Killing .*com.zallrwv4.app|Unable to start activity|ClassNotFoundException|NoClassDefFoundError' work/startup-logcat.txt > work/crash-summary.txt || true
+              adb shell dumpsys activity activities > work/activity-dump.txt 2>&1
+              adb shell dumpsys activity services > work/service-dump.txt 2>&1
+              exit 1
+            fi
+            checkpoint=$((checkpoint + 10))
+          done
+          adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
+          adb shell dumpsys activity activities > work/activity-dump.txt 2>&1
+          adb shell dumpsys activity services > work/service-dump.txt 2>&1
+          echo "EMULATOR_STARTUP=PASS: same process survived 48 seconds" > work/emulator-result.txt
+          SMOKE
+          chmod +x work/smoke-test.sh
+
       - name: Smoke-test signed APK in Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -261,55 +312,7 @@ jobs:
           disable-animations: true
           disable-linux-hw-accel: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            set +e
-            mkdir -p work
-            adb install work/ZallRW-TEST-ONLY.apk
-            install_rc=$?
-            if [ "$install_rc" -ne 0 ]; then
-              echo "APK_INSTALL_FAILED=$install_rc" > work/emulator-result.txt
-              adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
-              exit 1
-            fi
-
-            adb logcat -c
-            adb shell monkey -p com.zallrwv4.app 1
-            sleep 8
-            adb shell pidof com.zallrwv4.app > work/app-pid-initial.txt 2>&1
-            pid_rc=$?
-            initial_pid=$(tr -d '\r\n' < work/app-pid-initial.txt)
-
-            if [ "$pid_rc" -ne 0 ] || [ -z "$initial_pid" ]; then
-              echo "APP_PID_MISSING_AFTER_LAUNCH" > work/emulator-result.txt
-              adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
-              grep -E -i 'FATAL EXCEPTION|AndroidRuntime|Fatal signal|am_crash|Process .* has died|Killing .*com.zallrwv4.app|Unable to start activity|ClassNotFoundException|NoClassDefFoundError' work/startup-logcat.txt > work/crash-summary.txt
-              adb shell dumpsys activity activities > work/activity-dump.txt 2>&1
-              adb shell dumpsys activity services > work/service-dump.txt 2>&1
-              exit 1
-            fi
-
-            echo "Initial app PID: $initial_pid"
-            checkpoint=18
-            while [ "$checkpoint" -le 48 ]; do
-              sleep 10
-              adb shell pidof com.zallrwv4.app > work/app-pid-current.txt 2>&1
-              current_pid=$(tr -d '\r\n' < work/app-pid-current.txt)
-              if [ -z "$current_pid" ] || [ "$current_pid" != "$initial_pid" ]; then
-                echo "APP_PROCESS_CHANGED_AT_SECONDS=$checkpoint initial=$initial_pid current=$current_pid" > work/emulator-result.txt
-                adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
-                grep -E -i 'FATAL EXCEPTION|AndroidRuntime|Fatal signal|am_crash|Process .* has died|Killing .*com.zallrwv4.app|Unable to start activity|ClassNotFoundException|NoClassDefFoundError' work/startup-logcat.txt > work/crash-summary.txt
-                adb shell dumpsys activity activities > work/activity-dump.txt 2>&1
-                adb shell dumpsys activity services > work/service-dump.txt 2>&1
-                exit 1
-              fi
-              echo "checkpoint $checkpoint: PID $current_pid"
-              checkpoint=$((checkpoint + 10))
-            done
-
-            adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
-            adb shell dumpsys activity activities > work/activity-dump.txt 2>&1
-            adb shell dumpsys activity services > work/service-dump.txt 2>&1
-            echo "EMULATOR_STARTUP=PASS: same process survived 48 seconds" > work/emulator-result.txt
+          script: bash work/smoke-test.sh
 
 
       - name: Diagnose app exit call sites
