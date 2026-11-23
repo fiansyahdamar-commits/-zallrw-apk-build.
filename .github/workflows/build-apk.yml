@@ -279,6 +279,38 @@ jobs:
           echo "APKTOOL_BUILD=PASS" | tee ../build-result.txt
           ls -lh ../ZallRW-rebuild-test-unsigned.apk
 
+      - name: Inspect Compose DrawScope ABI in original Smali
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "work/Zall RW_src"
+          mkdir -p ../compose-diagnostics
+          OUT="../compose-diagnostics/compose-abi.txt"
+          {
+            echo "=== DrawScope class definition ==="
+            grep -R -n -B 3 -A 8 '^\\.class .*Landroidx/compose/ui/graphics/drawscope/DrawScope;' smali* --include='*.smali' || true
+            echo "=== DrawScope drawRect declarations and invocations ==="
+            grep -R -n -B 8 -A 10 'drawRect-n-J9OG0' smali* --include='*.smali' || true
+            echo "=== BackgroundNode class and draw implementation ==="
+            grep -R -l 'BackgroundNode' smali* --include='*.smali' | while read -r f; do
+              echo "--- $f ---"
+              grep -n -B 8 -A 14 -E '^\\.class|drawRect-n-J9OG0|DrawScope;->' "$f" || true
+            done
+            echo "=== duplicate DrawScope class definitions ==="
+            grep -R -l '^\\.class .*Landroidx/compose/ui/graphics/drawscope/DrawScope;' smali* --include='*.smali' || true
+          } > "$OUT"
+          cat "$OUT"
+
+      - name: Upload Compose ABI diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZallRW-COMPOSE-ABI-DIAGNOSTICS
+          path: work/compose-diagnostics/compose-abi.txt
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Sign isolated test APK and verify signature
         shell: bash
         run: |
