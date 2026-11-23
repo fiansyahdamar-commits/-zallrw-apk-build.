@@ -2,6 +2,10 @@ name: Build Zall RW APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "source.part-*"
+      - ".github/workflows/build-apk.yml"
   push:
     paths:
       - "source.part-*"
