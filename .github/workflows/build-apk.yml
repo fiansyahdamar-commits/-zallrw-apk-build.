@@ -264,7 +264,9 @@ jobs:
           print("apktool.yml generated with decimal package ID")
           PY
 
-          apktool b . -o ../ZallRW-rebuild-test-unsigned.apk
+          apktool b . --api-level 30 -o ../ZallRW-rebuild-test-unsigned.apk
+          echo "=== rebuilt DEX format ==="
+          unzip -p ../ZallRW-rebuild-test-unsigned.apk classes.dex | head -c 8 | od -An -tc
 
           # Apktool preserves coroutine Android classes but drops META-INF service
           # descriptors. Without this provider, Dispatchers.Main fails at startup.
