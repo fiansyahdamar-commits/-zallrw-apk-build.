@@ -265,6 +265,15 @@ jobs:
           PY
 
           apktool b . -o ../ZallRW-rebuild-test-unsigned.apk
+
+          # Apktool preserves coroutine Android classes but drops META-INF service
+          # descriptors. Without this provider, Dispatchers.Main fails at startup.
+          mkdir -p ../coroutines-service/META-INF/services
+          printf '%s\\n' 'kotlinx.coroutines.android.AndroidDispatcherFactory' > ../coroutines-service/META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory
+          (cd ../coroutines-service && zip -q -r ../ZallRW-rebuild-test-unsigned.apk META-INF)
+          unzip -p ../ZallRW-rebuild-test-unsigned.apk META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory | grep -Fx 'kotlinx.coroutines.android.AndroidDispatcherFactory'
+          echo "COROUTINES_ANDROID_SERVICE_PROVIDER=PASS"
+
           test -s ../ZallRW-rebuild-test-unsigned.apk
           unzip -tq ../ZallRW-rebuild-test-unsigned.apk
           echo "APKTOOL_BUILD=PASS" | tee ../build-result.txt
