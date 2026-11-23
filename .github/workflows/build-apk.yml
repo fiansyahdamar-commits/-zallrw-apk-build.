@@ -262,43 +262,45 @@ jobs:
           disable-linux-hw-accel: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            set -eu
+            set -u
+            mkdir -p work
+            capture_diagnostics() {
+              rc=$?
+              adb logcat -d -v threadtime -t 12000 > work/startup-logcat.txt 2>&1 || true
+              adb shell dumpsys activity activities > work/activity-dump.txt 2>&1 || true
+              adb shell dumpsys activity services > work/service-dump.txt 2>&1 || true
+              adb shell pidof com.zallrwv4.app > work/app-pid-final.txt 2>&1 || true
+              echo "EMULATOR_SCRIPT_EXIT=$rc" > work/emulator-result.txt
+              return 0
+            }
+            trap capture_diagnostics EXIT
+
             adb install work/ZallRW-TEST-ONLY.apk
             adb logcat -c
             adb shell monkey -p com.zallrwv4.app 1
             sleep 8
-            adb shell pidof com.zallrwv4.app > work/app-pid-initial.txt
-            test -s work/app-pid-initial.txt
+            adb shell pidof com.zallrwv4.app > work/app-pid-initial.txt 2>&1 || true
             initial_pid="$(tr -d '\r\n' < work/app-pid-initial.txt)"
-            test -n "$initial_pid"
+            if [ -z "$initial_pid" ]; then
+              echo "APP_PID_MISSING_AFTER_LAUNCH" >&2
+              adb logcat -d -v threadtime -t 12000 > work/startup-logcat.txt 2>&1 || true
+              grep -E -i 'FATAL EXCEPTION|AndroidRuntime|Fatal signal|am_crash|Process .* has died|Killing .*com.zallrwv4.app|Unable to start activity|ClassNotFoundException|NoClassDefFoundError' work/startup-logcat.txt > work/crash-summary.txt || true
+              exit 1
+            fi
             echo "Initial app PID: $initial_pid"
-            sleep 10
-            adb shell pidof com.zallrwv4.app > work/app-pid-current.txt
-            current_pid="$(tr -d '\r\n' < work/app-pid-current.txt)"
-            test -n "$current_pid"
-            test "$current_pid" = "$initial_pid"
-            echo "checkpoint 18s: PID $current_pid"
-            sleep 10
-            adb shell pidof com.zallrwv4.app > work/app-pid-current.txt
-            current_pid="$(tr -d '\r\n' < work/app-pid-current.txt)"
-            test -n "$current_pid"
-            test "$current_pid" = "$initial_pid"
-            echo "checkpoint 28s: PID $current_pid"
-            sleep 10
-            adb shell pidof com.zallrwv4.app > work/app-pid-current.txt
-            current_pid="$(tr -d '\r\n' < work/app-pid-current.txt)"
-            test -n "$current_pid"
-            test "$current_pid" = "$initial_pid"
-            echo "checkpoint 38s: PID $current_pid"
-            sleep 10
-            adb shell pidof com.zallrwv4.app > work/app-pid-current.txt
-            current_pid="$(tr -d '\r\n' < work/app-pid-current.txt)"
-            test -n "$current_pid"
-            test "$current_pid" = "$initial_pid"
-            echo "EMULATOR_STARTUP=PASS: same process survived 48 seconds" | tee work/emulator-result.txt
-            adb logcat -d -t 5000 > work/startup-logcat.txt
-            adb shell dumpsys activity activities > work/activity-dump.txt
-            adb shell dumpsys activity services > work/service-dump.txt
+            for checkpoint in 18 28 38 48; do
+              sleep 10
+              adb shell pidof com.zallrwv4.app > work/app-pid-current.txt 2>&1 || true
+              current_pid="$(tr -d '\r\n' < work/app-pid-current.txt)"
+              if [ -z "$current_pid" ] || [ "$current_pid" != "$initial_pid" ]; then
+                echo "APP_PROCESS_CHANGED_AT_SECONDS=$checkpoint initial=$initial_pid current=$current_pid" >&2
+                adb logcat -d -v threadtime -t 12000 > work/startup-logcat.txt 2>&1 || true
+                grep -E -i 'FATAL EXCEPTION|AndroidRuntime|Fatal signal|am_crash|Process .* has died|Killing .*com.zallrwv4.app|Unable to start activity|ClassNotFoundException|NoClassDefFoundError' work/startup-logcat.txt > work/crash-summary.txt || true
+                exit 1
+              fi
+              echo "checkpoint $checkpoint: PID $current_pid"
+            done
+            echo "EMULATOR_STARTUP=PASS: same process survived 48 seconds"
 
 
       - name: Diagnose app exit call sites
