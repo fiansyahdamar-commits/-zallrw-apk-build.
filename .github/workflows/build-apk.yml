@@ -190,13 +190,14 @@ jobs:
               count = content.count(expected_pin)
               if count:
                   matches.append((candidate, content, count))
-          assert len(matches) == 1 and matches[0][2] == 1, (
-              "Expected one original signing fingerprint across Smali tree; "
+          total_matches = sum(count for _, _, count in matches)
+          assert len(matches) == 1 and total_matches == 2, (
+              "Expected the original signing fingerprint twice in one Smali class; "
               f"found {[(str(p), n) for p, _, n in matches]}"
           )
           integrity_file, integrity, _ = matches[0]
-          integrity_file.write_text(integrity.replace(expected_pin, test_pin, 1))
-          print(f"CI_ONLY_SIGNING_FINGERPRINT_PATCH=PASS file={integrity_file}")
+          integrity_file.write_text(integrity.replace(expected_pin, test_pin))
+          print(f"CI_ONLY_SIGNING_FINGERPRINT_PATCH=PASS file={integrity_file} occurrences={total_matches}")
 
           # Ensure Android extracts bundled native libraries during installation.
           manifest_file = root / "AndroidManifest.xml"
