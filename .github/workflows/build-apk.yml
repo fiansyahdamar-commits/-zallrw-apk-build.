@@ -322,14 +322,24 @@ jobs:
           set +e
           mkdir -p work
           {
-            echo "=== System.exit references ==="
-            grep -R -n -B 12 -A 12 'Ljava/lang/System;->exit(I)V' "work/Zall RW_src"/smali* --include='*.smali' 2>/dev/null
-            echo "=== Runtime.exit references ==="
-            grep -R -n -B 12 -A 12 'Ljava/lang/Runtime;->exit(I)V' "work/Zall RW_src"/smali* --include='*.smali' 2>/dev/null
-            echo "=== process kill references ==="
-            grep -R -n -B 8 -A 8 -E 'Process;->killProcess|killProcess\(I\)V' "work/Zall RW_src"/smali* --include='*.smali' 2>/dev/null
+            echo "=== direct System/Runtime/process exit references ==="
+            grep -R -n -B 15 -A 15 -E 'Ljava/lang/(System|Runtime);->(exit|halt)\\(I\\)V|Process;->killProcess|killProcess\\(I\\)V' "work/Zall RW_src"/smali* --include='*.smali' 2>/dev/null
+            echo "=== Kotlin exitProcess and reflective exit references ==="
+            grep -R -n -B 10 -A 10 -E 'exitProcess|java/lang/System|java/lang/Runtime|forName|Method;->invoke|System\\.exit|Runtime\\.getRuntime|killProcess' "work/Zall RW_src"/smali* --include='*.smali' 2>/dev/null
+            echo "=== dex bytecode references to exit calls ==="
+            mkdir -p work/dex
+            unzip -oq work/ZallRW-TEST-ONLY.apk 'classes*.dex' -d work/dex
+            DEXDUMP="$(find "$ANDROID_HOME/build-tools" -type f -name dexdump 2>/dev/null | sort | tail -1)"
+            if [ -n "$DEXDUMP" ]; then
+              for dex in work/dex/classes*.dex; do
+                echo "--- $dex ---"
+                "$DEXDUMP" -d "$dex" 2>/dev/null | grep -B 18 -A 18 -E 'Ljava/lang/(System|Runtime);->(exit|halt)|killProcess|exitProcess' || true
+              done
+            else
+              echo "dexdump unavailable"
+            fi
           } > work/exit-call-sites.txt
-          test -s work/exit-call-sites.txt || echo "No explicit exit call sites found" > work/exit-call-sites.txt
+          test -s work/exit-call-sites.txt || echo "No exit-related call sites found" > work/exit-call-sites.txt
 
       - name: Upload rebuild test
         if: always()
