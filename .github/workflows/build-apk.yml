@@ -41,29 +41,30 @@ jobs:
           mkdir work
           unzip -q Zall_RW_src_patched.zip -d work
 
-      - name: Create temporary test signing key and fingerprint
+      - name: Prepare permanent release signing key and fingerprint
         shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
           cd work
-          TEST_STORE_PASS="$(openssl rand -hex 24)"
-          keytool -genkeypair -v \
-            -keystore zallrw-test-only.jks \
-            -storepass "$TEST_STORE_PASS" \
-            -keypass "$TEST_STORE_PASS" \
-            -alias zallrw-test-only \
-            -keyalg RSA -keysize 2048 -validity 30 \
-            -dname "CN=Zall RW Test Only, OU=QA, O=Zall RW, C=ID" >/dev/null 2>&1
-          keytool -exportcert \
-            -keystore zallrw-test-only.jks \
-            -storepass "$TEST_STORE_PASS" \
-            -alias zallrw-test-only \
-            -file zallrw-test-only-cert.der >/dev/null 2>&1
-          TEST_CERT_SHA_B64="$(openssl dgst -sha256 -binary zallrw-test-only-cert.der | base64 -w0)"
-          test -n "$TEST_CERT_SHA_B64"
-          echo "TEST_STORE_PASS=$TEST_STORE_PASS" >> "$GITHUB_ENV"
-          echo "TEST_CERT_SHA_B64=$TEST_CERT_SHA_B64" >> "$GITHUB_ENV"
-          echo "Temporary CI signer generated; certificate fingerprint prepared for integrity check."
+          test -n "$KEYSTORE_BASE64"
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > zallrw-release.jks
+          test -s zallrw-release.jks
+          keytool -exportcert -rfc -keystore zallrw-release.jks \
+            -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" \
+            -file zallrw-release-cert.pem >/dev/null 2>&1
+          openssl x509 -in zallrw-release-cert.pem -outform DER -out zallrw-release-cert.der
+          RELEASE_CERT_SHA_B64="$(openssl dgst -sha256 -binary zallrw-release-cert.der | base64 -w0)"
+          test -n "$RELEASE_CERT_SHA_B64"
+          echo "RELEASE_CERT_SHA_B64=$RELEASE_CERT_SHA_B64" >> "$GITHUB_ENV"
+          echo "Permanent release signing certificate prepared."
 
       - name: Normalize decompiled source and rebuild
         shell: bash
@@ -176,10 +177,10 @@ jobs:
           assert ui.count(old_help) == 1, "Redeem helper text not found uniquely"
           ui_file.write_text(ui.replace(old_help, new_help, 1))
 
-          # The app validates its own signing certificate at startup. Bind the CI-only
+          # The app validates its own signing certificate at startup. Bind the release
           # test APK to this run's temporary signer without changing the source archive.
           expected_pin = "NzXW8cqbFRP2WXcG9sOywgAsFT+AISDgqH5gDne81JY="
-          test_pin = os.environ.get("TEST_CERT_SHA_B64", "")
+          test_pin = os.environ.get("RELEASE_CERT_SHA_B64", "")
           assert test_pin, "Temporary test signer fingerprint was not prepared"
           matches = []
           for candidate in root.rglob("*.smali"):
@@ -197,7 +198,7 @@ jobs:
           )
           integrity_file, integrity, _ = matches[0]
           integrity_file.write_text(integrity.replace(expected_pin, test_pin))
-          print(f"CI_ONLY_SIGNING_FINGERPRINT_PATCH=PASS file={integrity_file} occurrences={total_matches}")
+          print(f"RELEASE_SIGNING_FINGERPRINT_PATCH=PASS file={integrity_file} occurrences={total_matches}")
 
           # Ensure Android extracts bundled native libraries during installation.
           manifest_file = root / "AndroidManifest.xml"
@@ -264,22 +265,22 @@ jobs:
           print("apktool.yml generated with decimal package ID")
           PY
 
-          apktool b . --api-level 30 -o ../ZallRW-rebuild-test-unsigned.apk
+          apktool b . --api-level 30 -o ../ZallRW-permanent-unsigned.apk
           echo "=== rebuilt DEX format ==="
-          unzip -p ../ZallRW-rebuild-test-unsigned.apk classes.dex | head -c 8 | od -An -tc
+          unzip -p ../ZallRW-permanent-unsigned.apk classes.dex | head -c 8 | od -An -tc
 
           # Apktool preserves coroutine Android classes but drops META-INF service
           # descriptors. Without this provider, Dispatchers.Main fails at startup.
           mkdir -p ../coroutines-service/META-INF/services
           printf '%s\n' 'kotlinx.coroutines.android.AndroidDispatcherFactory' > ../coroutines-service/META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory
-          (cd ../coroutines-service && zip -q -r ../ZallRW-rebuild-test-unsigned.apk META-INF)
-          unzip -p ../ZallRW-rebuild-test-unsigned.apk META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory | grep -Fx 'kotlinx.coroutines.android.AndroidDispatcherFactory'
+          (cd ../coroutines-service && zip -q -r ../ZallRW-permanent-unsigned.apk META-INF)
+          unzip -p ../ZallRW-permanent-unsigned.apk META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory | grep -Fx 'kotlinx.coroutines.android.AndroidDispatcherFactory'
           echo "COROUTINES_ANDROID_SERVICE_PROVIDER=PASS"
 
-          test -s ../ZallRW-rebuild-test-unsigned.apk
-          unzip -tq ../ZallRW-rebuild-test-unsigned.apk
+          test -s ../ZallRW-permanent-unsigned.apk
+          unzip -tq ../ZallRW-permanent-unsigned.apk
           echo "APKTOOL_BUILD=PASS" | tee ../build-result.txt
-          ls -lh ../ZallRW-rebuild-test-unsigned.apk
+          ls -lh ../ZallRW-permanent-unsigned.apk
 
       - name: Inspect Compose DrawScope ABI in original Smali
         if: always()
@@ -313,25 +314,31 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Sign isolated test APK and verify signature
+      - name: Sign permanent APK and verify signature
         shell: bash
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
           cd work
-          # Use the same ephemeral signer whose fingerprint was patched before rebuilding.
-          test -s zallrw-test-only.jks
-          zipalign -f 4 ZallRW-rebuild-test-unsigned.apk ZallRW-test-aligned.apk
+          test -s zallrw-release.jks
+          zipalign -f 4 ZallRW-permanent-unsigned.apk ZallRW-permanent-aligned.apk
           apksigner sign \
-            --ks zallrw-test-only.jks \
-            --ks-key-alias zallrw-test-only \
-            --ks-pass "pass:$TEST_STORE_PASS" \
-            --key-pass "pass:$TEST_STORE_PASS" \
-            --out ZallRW-TEST-ONLY.apk ZallRW-test-aligned.apk
-          apksigner verify --verbose --print-certs ZallRW-TEST-ONLY.apk | tee signing-result.txt
+            --ks zallrw-release.jks \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "pass:$KEYSTORE_PASSWORD" \
+            --key-pass "pass:$KEY_PASSWORD" \
+            --out ZallRW-PERMANENT.apk ZallRW-permanent-aligned.apk
+          apksigner verify --verbose --print-certs ZallRW-PERMANENT.apk | tee signing-result.txt
           grep -q "Verifies" signing-result.txt
-          echo "TEST_APK_SIGNATURE=PASS" >> build-result.txt
-          rm -f zallrw-test-only.jks zallrw-test-only-cert.der ZallRW-test-aligned.apk
-          ls -lh ZallRW-TEST-ONLY.apk
+          actual_pin="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' signing-result.txt | head -1 | tr 'A-F' 'a-f')"
+          expected_pin="$(openssl dgst -sha256 -binary zallrw-release-cert.der | xxd -p -c 256)"
+          test -n "$actual_pin" && test "$actual_pin" = "$expected_pin"
+          echo "PERMANENT_APK_SIGNATURE=PASS" >> build-result.txt
+          rm -f zallrw-release.jks zallrw-release-cert.pem zallrw-release-cert.der ZallRW-permanent-aligned.apk
+          ls -lh ZallRW-PERMANENT.apk
 
 
       - name: Prepare emulator smoke-test script
@@ -342,7 +349,7 @@ jobs:
           #!/usr/bin/env bash
           set +e
           mkdir -p work
-          adb install work/ZallRW-TEST-ONLY.apk
+          adb install work/ZallRW-PERMANENT.apk
           install_rc=$?
           if [ "$install_rc" -ne 0 ]; then
             echo "APK_INSTALL_FAILED=$install_rc" > work/emulator-result.txt
@@ -412,7 +419,7 @@ jobs:
             grep -R -n -B 10 -A 10 -E 'exitProcess|java/lang/System|java/lang/Runtime|forName|Method;->invoke|System\\.exit|Runtime\\.getRuntime|killProcess' "work/Zall RW_src"/smali* --include='*.smali' 2>/dev/null
             echo "=== dex bytecode references to exit calls ==="
             mkdir -p work/dex
-            unzip -oq work/ZallRW-TEST-ONLY.apk 'classes*.dex' -d work/dex
+            unzip -oq work/ZallRW-PERMANENT.apk 'classes*.dex' -d work/dex
             DEXDUMP="$(find "$ANDROID_HOME/build-tools" -type f -name dexdump 2>/dev/null | sort | tail -1)"
             if [ -n "$DEXDUMP" ]; then
               for dex in work/dex/classes*.dex; do
@@ -432,8 +439,8 @@ jobs:
           name: ZallRW-REBUILD-TEST-DIAGNOSTICS
           path: |
             work/build-result.txt
-            work/ZallRW-rebuild-test-unsigned.apk
-            work/ZallRW-TEST-ONLY.apk
+            work/ZallRW-permanent-unsigned.apk
+            work/ZallRW-PERMANENT.apk
             work/signing-result.txt
             work/emulator-result.txt
             work/startup-logcat.txt
