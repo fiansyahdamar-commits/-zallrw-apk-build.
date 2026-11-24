@@ -201,22 +201,31 @@ jobs:
           # existing dark surfaces remain near-black.
           theme_file = root / "smali_classes2/z/rd1.smali"
           theme = theme_file.read_text()
-          color_anchor = '    invoke-static {v4}, Landroidx/compose/ui/graphics/ColorKt;->Color(I)J\\n    move-result-wide v11\\n'
+          color_anchor = """    invoke-static {v4}, Landroidx/compose/ui/graphics/ColorKt;->Color(I)J
+
+              move-result-wide v11
+          """
           assert theme.count(color_anchor) == 1, "Compose theme seed-color anchor not found uniquely"
           theme = theme.replace(
               color_anchor,
-              '    const v4, -0x2b0000    # 0xFFD50000 red theme seed\\n' + color_anchor,
+              '    const v4, -0x2b0000    # 0xFFD50000 red theme seed\n' + color_anchor,
               1
           )
-          mode_anchor = '    move-result-wide v11\\n    if-eqz v2, :cond_d\\n'
+          mode_anchor = """    move-result-wide v11
+
+              if-eqz v2, :cond_d
+          """
           assert theme.count(mode_anchor) == 1, "Compose theme mode anchor not found uniquely"
           theme = theme.replace(
               mode_anchor,
-              '    move-result-wide v11\\n\\n    const/4 v1, 0x1    # force dark theme\\n'
-              '    const/4 v2, 0x0    # disable Android dynamic wallpaper colors\\n\\n'
-              '    if-eqz v2, :cond_d\\n',
+              '    move-result-wide v11\n\n    const/4 v1, 0x1    # force dark theme\n'
+              '    const/4 v2, 0x0    # disable Android dynamic wallpaper colors\n\n'
+              '    if-eqz v2, :cond_d\n',
               1
           )
+          theme_file.write_text(theme)
+          assert '0xFFD50000 red theme seed' in theme
+          print("COMPOSE_BLACK_RED_THEME_PATCH=PASS")
           theme_file.write_text(theme)
           assert '0xFFD50000 red theme seed' in theme
           print("COMPOSE_BLACK_RED_THEME_PATCH=PASS")
