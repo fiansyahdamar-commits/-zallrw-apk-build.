@@ -287,6 +287,21 @@ jobs:
           theme_file.write_text(theme)
           assert '0xFFD50000 red theme seed' in theme
           print("COMPOSE_BLACK_RED_THEME_PATCH=PASS")
+          # Increase the app-wide Material 3 corner radii without touching screen logic.
+          shapes_file = root / "smali_classes2/z/p51.smali"
+          shapes = shapes_file.read_text()
+          shape_values = {
+              "0x40800000    # 4.0f": "0x41200000    # 10.0f",
+              "0x41000000    # 8.0f": "0x41600000    # 14.0f",
+              "0x41400000    # 12.0f": "0x41900000    # 18.0f",
+              "0x41800000    # 16.0f": "0x41b00000    # 22.0f",
+              "0x41c00000    # 24.0f": "0x41e00000    # 28.0f",
+          }
+          for old, new in shape_values.items():
+              assert shapes.count(old) == 1, f"Expected one Material 3 shape token: {old}"
+              shapes = shapes.replace(old, new, 1)
+          shapes_file.write_text(shapes)
+          print("DARKVEN_ROUNDED_MATERIAL3_SHAPES=PASS (10/14/18/22/28dp)")
 
           PY
           grep -q 'functions/v1/admin-api-v2/redeem' "smali_classes2/z/du0.smali"
