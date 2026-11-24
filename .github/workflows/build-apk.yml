@@ -196,7 +196,7 @@ jobs:
           # Rebrand launcher metadata and generate consistent DARKVEN DV Crown icons.
           manifest_file = root / "AndroidManifest.xml"
           manifest = manifest_file.read_text()
-          app_match = re.search(r"<application\\b[^>]*>", manifest)
+          app_match = re.search(r"<application\b[^>]*>", manifest)
           assert app_match, "Android application manifest element not found"
           app_tag = app_match.group(0)
           app_tag = re.sub(r'android:label="[^"]*"', 'android:label="DARKVEN"', app_tag)
