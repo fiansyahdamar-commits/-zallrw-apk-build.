@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p work/theme-diagnostics
-          find "work/Zall RW_src" -type f \\( -name '*.smali' -o -name '*.xml' \\) | grep -E 'Theme|Color|NavBar|NavGraph|HomeScreen|SettingsScreen|ProfileScreen' > work/theme-diagnostics/ui-files.txt || true
+          find "work/Zall RW_src" -type f \( -name '*.smali' -o -name '*.xml' \) | grep -E 'Theme|Color|NavBar|NavGraph|HomeScreen|SettingsScreen|ProfileScreen' > work/theme-diagnostics/ui-files.txt || true
           grep -R -n -E 'ZallRWV4Theme|ProgramRed|0xFF[0-9A-Fa-f]{6}|ColorScheme|darkColorScheme|lightColorScheme' "work/Zall RW_src"/smali* --include='*.smali' > work/theme-diagnostics/theme-color-references.txt || true
           while IFS= read -r file; do
             case "$file" in
@@ -380,7 +380,7 @@ jobs:
           mkdir -p work
           {
             echo "=== direct System/Runtime/process exit references ==="
-            grep -R -n -B 15 -A 15 -E 'Ljava/lang/(System|Runtime);->(exit|halt)\\(I\\)V|Process;->killProcess|killProcess\\(I\\)V' "work/Zall RW_src"/smali* --include='*.smali' 2>/dev/null
+            grep -R -n -B 15 -A 15 -E 'Ljava/lang/(System|Runtime);->(exit|halt)\(I\)V|Process;->killProcess|killProcess\(I\)V' "work/Zall RW_src"/smali* --include='*.smali' 2>/dev/null
             echo "=== Kotlin exitProcess and reflective exit references ==="
             grep -R -n -B 10 -A 10 -E 'exitProcess|java/lang/System|java/lang/Runtime|forName|Method;->invoke|System\\.exit|Runtime\\.getRuntime|killProcess' "work/Zall RW_src"/smali* --include='*.smali' 2>/dev/null
             echo "=== dex bytecode references to exit calls ==="
