@@ -302,6 +302,19 @@ jobs:
               shapes = shapes.replace(old, new, 1)
           shapes_file.write_text(shapes)
           print("DARKVEN_ROUNDED_MATERIAL3_SHAPES=PASS (10/14/18/22/28dp)")
+          # Hide only the Settings navigation glyphs; keep the route and label intact.
+          transparent_settings_icon = '''<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="48dp" android:height="48dp"
+              android:viewportWidth="48" android:viewportHeight="48">
+              <path android:fillColor="#00000000" android:pathData="M0,0h48v48h-48z" />
+          </vector>
+          '''
+          for icon_name in ("ic_settings_round.xml", "ic_settings_outline.xml"):
+              icon_file = root / "res" / "drawable" / icon_name
+              assert icon_file.exists(), f"Settings navigation drawable missing: {icon_file}"
+              icon_file.write_text(transparent_settings_icon)
+          print("DARKVEN_SETTINGS_NAV_ICON_HIDDEN=PASS (settings route retained)")
 
           PY
           grep -q 'functions/v1/admin-api-v2/redeem' "smali_classes2/z/du0.smali"
