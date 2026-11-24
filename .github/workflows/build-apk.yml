@@ -358,6 +358,11 @@ jobs:
             echo "ANDROID_BOOT_NOT_COMPLETED" > work/emulator-result.txt
             exit 1
           fi
+          # A fresh hosted AVD can report boot-complete while PackageManager,
+          # StorageManager and system_server are still doing first-boot work.
+          # Let those services settle before installing/launching the app.
+          echo "Waiting 45 seconds for Android first-boot background work to settle..."
+          sleep 45
           adb shell input keyevent 82 >/dev/null 2>&1 || true
           # Settings pre-boot initialization can stall in the headless emulator.
           # Stop only the emulator's Settings app; this does not modify the Zall RW APK.
@@ -439,7 +444,7 @@ jobs:
           profile: pixel_2
           disable-animations: true
           disable-linux-hw-accel: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096 -cores 2
           script: bash work/smoke-test.sh
 
 
