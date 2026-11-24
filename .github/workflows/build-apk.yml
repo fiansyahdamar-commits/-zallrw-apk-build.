@@ -110,7 +110,7 @@ jobs:
           assert s.count(old_url) == 1, "Expected exactly one old redeem endpoint"
           s = s.replace(old_url, new_url, 1)
 
-          parse_anchor = '    iget-object v11, v0, Lz/du0;->j:Ljava/lang/String;\\n'
+          parse_anchor = '    iget-object v11, v0, Lz/du0;->j:Ljava/lang/String;\n'
           assert s.count(parse_anchor) == 1, "Could not locate redeem input register"
           # Leave the original code value intact. No password parsing or password JSON field.
           request_file.write_text(s)
