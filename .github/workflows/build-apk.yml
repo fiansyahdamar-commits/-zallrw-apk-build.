@@ -452,14 +452,14 @@ jobs:
             # Hosted AVD can freeze SystemUI independently while the app remains
             # resumed and responsive enough to render its first frame. Record this
             # separately; do not report it as an application crash/ANR.
-            if grep -Fq "mResumedActivity: com.zallrwv4.app/.MainActivity" work/activity-dump.txt && [ "$ui_ready" = "1" ]; then
+            if grep -Eq "mResumedActivity:.*com\\.zallrwv4\\.app/\\.MainActivity" work/activity-dump.txt && [ "$ui_ready" = "1" ]; then
               echo "EMULATOR_STARTUP=PASS_WITH_SYSTEMUI_WARNING: Zall RW displayed its first frame and same process survived 48 seconds; ANR belongs to Android SystemUI, not Zall RW" > work/emulator-result.txt
             else
               echo "EMULATOR_STARTUP=FAIL: system ANR overlay prevented confirming Zall RW as resumed" > work/emulator-result.txt
               exit 1
             fi
           else
-            if grep -Fq "mResumedActivity: com.zallrwv4.app/.MainActivity" work/activity-dump.txt && [ "$ui_ready" = "1" ]; then
+            if grep -Eq "mResumedActivity:.*com\\.zallrwv4\\.app/\\.MainActivity" work/activity-dump.txt && [ "$ui_ready" = "1" ]; then
               echo "EMULATOR_STARTUP=PASS: Zall RW displayed its first frame and same process survived 48 seconds; no ANR overlay detected" > work/emulator-result.txt
             else
               echo "EMULATOR_STARTUP=FAIL: could not confirm Zall RW resumed with first frame" > work/emulator-result.txt
