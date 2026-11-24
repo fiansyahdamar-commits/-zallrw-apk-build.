@@ -358,19 +358,39 @@ jobs:
             echo "ANDROID_BOOT_NOT_COMPLETED" > work/emulator-result.txt
             exit 1
           fi
-          # A fresh hosted AVD can report boot-complete while PackageManager,
-          # StorageManager and system_server are still doing first-boot work.
-          # Let those services settle before installing/launching the app.
-          echo "Waiting 45 seconds for Android first-boot background work to settle..."
-          sleep 45
+          # A fresh hosted AVD can report boot-complete before PackageManager is ready.
+          # Wait for the package service explicitly, then retry installation if it flakes.
+          echo "Waiting for Android first-boot background work to settle..."
+          sleep 30
+          package_ready=0
+          for attempt in $(seq 1 24); do
+            if adb shell cmd package list packages >/dev/null 2>&1; then
+              package_ready=1
+              break
+            fi
+            echo "PackageManager unavailable (attempt $attempt); waiting..."
+            sleep 5
+          done
+          if [ "$package_ready" -ne 1 ]; then
+            echo "ANDROID_PACKAGE_MANAGER_UNAVAILABLE" > work/emulator-result.txt
+            adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
+            exit 1
+          fi
           adb shell input keyevent 82 >/dev/null 2>&1 || true
-          # Settings pre-boot initialization can stall in the headless emulator.
-          # Stop only the emulator's Settings app; this does not modify the Zall RW APK.
+          # Stop only the emulator's Settings app; this does not modify Zall RW.
           adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
-          adb install work/ZallRW-PERMANENT.apk
-          install_rc=$?
+          install_rc=1
+          for attempt in $(seq 1 3); do
+            adb wait-for-device
+            if adb install work/ZallRW-PERMANENT.apk; then
+              install_rc=0
+              break
+            fi
+            echo "APK install attempt $attempt failed; waiting for package service..."
+            sleep 10
+          done
           if [ "$install_rc" -ne 0 ]; then
-            echo "APK_INSTALL_FAILED=$install_rc" > work/emulator-result.txt
+            echo "APK_INSTALL_FAILED_AFTER_3_ATTEMPTS" > work/emulator-result.txt
             adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
             exit 1
           fi
