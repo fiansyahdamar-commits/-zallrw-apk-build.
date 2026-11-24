@@ -357,7 +357,18 @@ jobs:
           fi
           adb logcat -c
           adb shell monkey -p com.zallrwv4.app 1
-          sleep 8
+          # Wait for Android to report that the app's first frame was displayed.
+          # The previous 8-second capture happened before Compose finished startup.
+          ui_ready=0
+          for attempt in $(seq 1 12); do
+            if adb logcat -d -v brief -s ActivityTaskManager:I 2>/dev/null | grep -Fq "Displayed com.zallrwv4.app/.MainActivity"; then
+              ui_ready=1
+              break
+            fi
+            sleep 5
+          done
+          sleep 3
+          echo "APP_FIRST_FRAME_DISPLAYED=$ui_ready" > work/ui-ready-result.txt
           adb shell pidof com.zallrwv4.app > work/app-pid-initial.txt 2>&1
           adb exec-out screencap -p > work/ZallRW-emulator-screenshot.png
           test -s work/ZallRW-emulator-screenshot.png
@@ -444,6 +455,7 @@ jobs:
             work/ZallRW-PERMANENT.apk
             work/signing-result.txt
             work/emulator-result.txt
+            work/ui-ready-result.txt
             work/ZallRW-emulator-screenshot.png
             work/startup-logcat.txt
             work/app-pid-initial.txt
