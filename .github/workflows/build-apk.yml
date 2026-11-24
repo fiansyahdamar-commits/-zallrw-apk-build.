@@ -20,7 +20,7 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y zipalign apksigner curl unzip python3-yaml
+          sudo apt-get install -y zipalign apksigner curl unzip python3-yaml python3-pil
 
       - name: Install modern Apktool
         shell: bash
@@ -192,6 +192,64 @@ jobs:
           manifest_file.write_text(manifest)
           print("NATIVE_LIBRARY_EXTRACTION=true")
           print("ANDROID_TARGET_SDK=28")
+
+          # Rebrand launcher metadata and generate consistent DARKVEN DV Crown icons.
+          manifest_file = root / "AndroidManifest.xml"
+          manifest = manifest_file.read_text()
+          app_match = re.search(r"<application\\b[^>]*>", manifest)
+          assert app_match, "Android application manifest element not found"
+          app_tag = app_match.group(0)
+          app_tag = re.sub(r'android:label="[^"]*"', 'android:label="DARKVEN"', app_tag)
+          if 'android:label=' not in app_tag:
+              app_tag = app_tag[:-1] + ' android:label="DARKVEN">'
+          app_tag = re.sub(r'android:icon="[^"]*"', 'android:icon="@mipmap/ic_launcher"', app_tag)
+          if 'android:icon=' not in app_tag:
+              app_tag = app_tag[:-1] + ' android:icon="@mipmap/ic_launcher">'
+          app_tag = re.sub(r'android:roundIcon="[^"]*"', 'android:roundIcon="@mipmap/ic_launcher_round"', app_tag)
+          if 'android:roundIcon=' not in app_tag:
+              app_tag = app_tag[:-1] + ' android:roundIcon="@mipmap/ic_launcher_round">'
+          manifest = manifest[:app_match.start()] + app_tag + manifest[app_match.end():]
+          manifest_file.write_text(manifest)
+
+          from PIL import Image, ImageDraw, ImageFont
+          import math
+          densities = {"mdpi":48, "hdpi":72, "xhdpi":96, "xxhdpi":144, "xxxhdpi":192}
+          for density, size in densities.items():
+              im = Image.new("RGB", (size, size), (7, 5, 8))
+              px = im.load()
+              for y in range(size):
+                  for x in range(size):
+                      glow = max(0, 1 - math.sqrt((x-size*.5)**2 + (y-size*.5)**2)/(size*.75))
+                      px[x,y] = (int(8+22*glow), int(3+2*glow), int(7+5*glow))
+              d = ImageDraw.Draw(im)
+              margin = max(2, size//18)
+              d.rounded_rectangle((margin,margin,size-margin-1,size-margin-1), radius=size//5,
+                                  outline=(220,12,32), width=max(1,size//32))
+              # Crown silhouette
+              crown_y = int(size*.19)
+              points = [(int(size*.27),int(size*.34)),(int(size*.20),int(size*.20)),
+                        (int(size*.39),int(size*.29)),(int(size*.50),int(size*.13)),
+                        (int(size*.61),int(size*.29)),(int(size*.80),int(size*.20)),
+                        (int(size*.73),int(size*.34))]
+              d.polygon(points, fill=(190,12,30), outline=(255,95,105))
+              d.line((int(size*.25),int(size*.37),int(size*.75),int(size*.37)),
+                     fill=(235,25,42), width=max(1,size//28))
+              try:
+                  font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", int(size*.43))
+              except OSError:
+                  font = ImageFont.load_default()
+              bbox = d.textbbox((0,0), "DV", font=font, stroke_width=max(0,size//100))
+              tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
+              d.text(((size-tw)//2, int(size*.43)-bbox[1]), "DV", font=font,
+                     fill=(238,238,242), stroke_width=max(0,size//100), stroke_fill=(115,8,20))
+              d.line((int(size*.28),int(size*.83),int(size*.72),int(size*.83)),
+                     fill=(210,15,35), width=max(1,size//36))
+              outdir = root / "res" / ("mipmap-" + density)
+              outdir.mkdir(parents=True, exist_ok=True)
+              im.save(outdir / "ic_launcher.png", optimize=True)
+              im.save(outdir / "ic_launcher_round.png", optimize=True)
+          print("DARKVEN_APP_LABEL=PASS")
+          print("DARKVEN_DV_CROWN_LAUNCHER_ICON=PASS")
 
           print("REDEEM_PASSWORD_PATCH=PASS")
 
