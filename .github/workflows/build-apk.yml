@@ -348,6 +348,20 @@ jobs:
           #!/usr/bin/env bash
           set +e
           mkdir -p work
+          # Let Android finish its first-boot Settings initialization before app testing.
+          boot_wait=0
+          until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] || [ "$boot_wait" -ge 60 ]; do
+            sleep 2
+            boot_wait=$((boot_wait + 2))
+          done
+          if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ]; then
+            echo "ANDROID_BOOT_NOT_COMPLETED" > work/emulator-result.txt
+            exit 1
+          fi
+          adb shell input keyevent 82 >/dev/null 2>&1 || true
+          # Settings pre-boot initialization can stall in the headless emulator.
+          # Stop only the emulator's Settings app; this does not modify the Zall RW APK.
+          adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
           adb install work/ZallRW-PERMANENT.apk
           install_rc=$?
           if [ "$install_rc" -ne 0 ]; then
@@ -356,6 +370,7 @@ jobs:
             exit 1
           fi
           adb logcat -c
+          adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
           adb shell monkey -p com.zallrwv4.app 1
           # Wait for Android to report that the app's first frame was displayed.
           # The previous 8-second capture happened before Compose finished startup.
@@ -397,10 +412,19 @@ jobs:
             fi
             checkpoint=$((checkpoint + 10))
           done
+          # Clear a Settings-only ANR overlay if Android's pre-boot Settings task
+          # was still running; then capture the app after the full stability window.
+          adb shell am force-stop com.android.settings >/dev/null 2>&1 || true
+          sleep 2
+          adb exec-out screencap -p > work/ZallRW-emulator-screenshot.png
           adb logcat -d -v threadtime > work/startup-logcat.txt 2>&1
           adb shell dumpsys activity activities > work/activity-dump.txt 2>&1
           adb shell dumpsys activity services > work/service-dump.txt 2>&1
-          echo "EMULATOR_STARTUP=PASS: same process survived 48 seconds" > work/emulator-result.txt
+          if grep -q "Application Not Responding: com.android.settings" work/activity-dump.txt; then
+            echo "EMULATOR_STARTUP=PASS: Zall RW survived 48 seconds; Android Settings ANR overlay persisted" > work/emulator-result.txt
+          else
+            echo "EMULATOR_STARTUP=PASS: same process survived 48 seconds; no Settings ANR overlay" > work/emulator-result.txt
+          fi
           SMOKE
           chmod +x work/smoke-test.sh
 
