@@ -359,6 +359,8 @@ jobs:
           adb shell monkey -p com.zallrwv4.app 1
           sleep 8
           adb shell pidof com.zallrwv4.app > work/app-pid-initial.txt 2>&1
+          adb exec-out screencap -p > work/ZallRW-emulator-screenshot.png
+          test -s work/ZallRW-emulator-screenshot.png
           pid_rc=$?
           initial_pid=$(tr -d '\r\n' < work/app-pid-initial.txt)
           if [ "$pid_rc" -ne 0 ] || [ -z "$initial_pid" ]; then
@@ -442,6 +444,7 @@ jobs:
             work/ZallRW-PERMANENT.apk
             work/signing-result.txt
             work/emulator-result.txt
+            work/ZallRW-emulator-screenshot.png
             work/startup-logcat.txt
             work/app-pid-initial.txt
             work/app-pid-current.txt
