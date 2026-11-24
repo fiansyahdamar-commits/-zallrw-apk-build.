@@ -41,6 +41,29 @@ jobs:
           mkdir work
           unzip -q Zall_RW_src_patched.zip -d work
 
+      - name: Capture existing app theme and UI source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/theme-diagnostics
+          find "work/Zall RW_src" -type f \\( -name '*.smali' -o -name '*.xml' \\) | grep -E 'Theme|Color|NavBar|NavGraph|HomeScreen|SettingsScreen|ProfileScreen' > work/theme-diagnostics/ui-files.txt || true
+          grep -R -n -E 'ZallRWV4Theme|ProgramRed|0xFF[0-9A-Fa-f]{6}|ColorScheme|darkColorScheme|lightColorScheme' "work/Zall RW_src"/smali* --include='*.smali' > work/theme-diagnostics/theme-color-references.txt || true
+          while IFS= read -r file; do
+            case "$file" in
+              *Theme*|*NavBar*|*NavGraph*|*HomeScreen*|*SettingsScreen*|*ProfileScreen*)
+                mkdir -p "work/theme-diagnostics/$(dirname "$file" | sed 's#work/Zall RW_src/##')"
+                cp "$file" "work/theme-diagnostics/$(dirname "$file" | sed 's#work/Zall RW_src/##')/" ;;
+            esac
+          done < work/theme-diagnostics/ui-files.txt
+          tar -czf work/theme-diagnostics.tar.gz -C work theme-diagnostics
+
+      - name: Upload theme source diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZallRW-THEME-SOURCE-DIAGNOSTICS
+          path: work/theme-diagnostics.tar.gz
+          retention-days: 7
+
       - name: Prepare permanent release signing key and fingerprint
         shell: bash
         env:
