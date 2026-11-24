@@ -47,10 +47,11 @@ jobs:
           set -euo pipefail
           mkdir -p work/theme-diagnostics
           cp -a "work/Zall RW_src/smali/z" work/theme-diagnostics/app-smali-z
+          cp -a "work/Zall RW_src/smali_classes2/z" work/theme-diagnostics/app-smali-classes2-z
           cp -a "work/Zall RW_src/res" work/theme-diagnostics/resources
-          find "work/Zall RW_src/smali/z" -maxdepth 1 -type f -name '*.smali' -printf '%f\\n' | sort > work/theme-diagnostics/app-classes.txt
-          grep -R -n -E 'ZallRWV4Theme|ProgramRed|ColorSchemeKt;->|darkColorScheme|lightColorScheme|Color\\.ctor|0xFF[0-9A-Fa-f]{6}' "work/Zall RW_src/smali/z" --include='*.smali' > work/theme-diagnostics/app-theme-references.txt || true
-          grep -R -n -E 'Settings|Home|Dashboard|Profile|NavigationBar|TopAppBar|BottomAppBar' "work/Zall RW_src/smali/z" --include='*.smali' > work/theme-diagnostics/app-ui-label-references.txt || true
+          find "work/Zall RW_src/smali/z" "work/Zall RW_src/smali_classes2/z" -maxdepth 1 -type f -name '*.smali' -printf '%p\\n' | sort > work/theme-diagnostics/app-classes.txt
+          grep -R -n -E 'ZallRWV4Theme|ProgramRed|ColorSchemeKt;->|darkColorScheme|lightColorScheme|Color\\.ctor|0xFF[0-9A-Fa-f]{6}|MaterialThemeKt;->' "work/Zall RW_src/smali/z" "work/Zall RW_src/smali_classes2/z" --include='*.smali' > work/theme-diagnostics/app-theme-references.txt || true
+          grep -R -n -E 'Settings|Home|Dashboard|Profile|NavigationBar|TopAppBar|BottomAppBar' "work/Zall RW_src/smali/z" "work/Zall RW_src/smali_classes2/z" --include='*.smali' > work/theme-diagnostics/app-ui-label-references.txt || true
           tar -czf work/theme-diagnostics.tar.gz -C work theme-diagnostics
 
       - name: Upload Compose app UI source diagnostics
