@@ -233,6 +233,37 @@ jobs:
               outdir.mkdir(parents=True, exist_ok=True)
               im.save(outdir / "ic_launcher.png", optimize=True)
               im.save(outdir / "ic_launcher_round.png", optimize=True)
+          # Android 8+ prioritizes adaptive-icon XML over density PNGs. The old
+          # adaptive XML still referenced the original Zall logo, so explicitly
+          # redirect both launcher variants to the new DARKVEN foreground artwork.
+          fg_size = 512
+          fg = Image.new("RGBA", (fg_size, fg_size), (0, 0, 0, 0))
+          fd = ImageDraw.Draw(fg)
+          crown_points = [(138,190),(102,112),(205,164),(256,76),(307,164),(410,112),(374,190)]
+          fd.polygon(crown_points, fill=(220,12,35,255), outline=(255,92,108,255))
+          fd.rounded_rectangle((128,198,384,224), radius=10, fill=(238,24,45,255))
+          try:
+              ffont = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 174)
+          except OSError:
+              ffont = ImageFont.load_default()
+          fb = fd.textbbox((0,0), "DV", font=ffont, stroke_width=2)
+          fw, fh = fb[2]-fb[0], fb[3]-fb[1]
+          fd.text(((fg_size-fw)//2, 248-fb[1]), "DV", font=ffont,
+                  fill=(245,245,248,255), stroke_width=2, stroke_fill=(120,5,20,255))
+          fg_dir = root / "res" / "drawable-nodpi"
+          fg_dir.mkdir(parents=True, exist_ok=True)
+          fg.save(fg_dir / "darkven_launcher_foreground.png", optimize=True)
+          adaptive_xml = '''<?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background><color android:color="#080308" /></background>
+              <foreground><inset android:drawable="@drawable/darkven_launcher_foreground" android:inset="12%" /></foreground>
+          </adaptive-icon>
+          '''
+          adaptive_dir = root / "res" / "mipmap-anydpi-v26"
+          adaptive_dir.mkdir(parents=True, exist_ok=True)
+          (adaptive_dir / "ic_launcher.xml").write_text(adaptive_xml)
+          (adaptive_dir / "ic_launcher_round.xml").write_text(adaptive_xml)
+          print("DARKVEN_ADAPTIVE_LAUNCHER_ICON=PASS (old Zall logo reference removed)")
           print("DARKVEN_APP_LABEL=PASS")
           print("DARKVEN_DV_CROWN_LAUNCHER_ICON=PASS")
 
@@ -274,17 +305,17 @@ jobs:
           shapes_file = root / "smali_classes2/z/p51.smali"
           shapes = shapes_file.read_text()
           shape_values = {
-              "0x40800000    # 4.0f": "0x41200000    # 10.0f",
-              "0x41000000    # 8.0f": "0x41600000    # 14.0f",
-              "0x41400000    # 12.0f": "0x41900000    # 18.0f",
-              "0x41800000    # 16.0f": "0x41b00000    # 22.0f",
-              "0x41c00000    # 24.0f": "0x41e00000    # 28.0f",
+              "0x40800000    # 4.0f": "0x41800000    # 16.0f",
+              "0x41000000    # 8.0f": "0x41a00000    # 20.0f",
+              "0x41400000    # 12.0f": "0x41c00000    # 24.0f",
+              "0x41800000    # 16.0f": "0x41e00000    # 28.0f",
+              "0x41c00000    # 24.0f": "0x42000000    # 32.0f",
           }
           for old, new in shape_values.items():
               assert shapes.count(old) == 1, f"Expected one Material 3 shape token: {old}"
               shapes = shapes.replace(old, new, 1)
           shapes_file.write_text(shapes)
-          print("DARKVEN_ROUNDED_MATERIAL3_SHAPES=PASS (10/14/18/22/28dp)")
+          print("DARKVEN_ROUNDED_MATERIAL3_SHAPES=PASS (16/20/24/28/32dp)")
           # Hide only the Settings navigation glyphs; keep the route and label intact.
           transparent_settings_icon = '''<?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
