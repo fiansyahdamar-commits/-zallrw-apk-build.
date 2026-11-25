@@ -126,8 +126,6 @@ jobs:
           # Keep the endpoint and request payload from the supplied source archive unchanged.
           print("REDEEM_ENDPOINT_PRESERVED=PASS")
 
-          PY
-
           # The app validates its own signing certificate at startup. Bind the release
           # test APK to this run's temporary signer without changing the source archive.
           expected_pin = "NzXW8cqbFRP2WXcG9sOywgAsFT+AISDgqH5gDne81JY="
