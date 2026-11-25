@@ -301,6 +301,17 @@ jobs:
               icon_file.write_text(transparent_settings_icon)
           print("DARKVEN_SETTINGS_NAV_ICON_HIDDEN=PASS (settings route retained)")
 
+          # Remove the Settings item from the bottom-navigation item list itself.
+          # This removes its invisible touch target as well as its icon; the Settings
+          # screen implementation and internal route are left untouched.
+          nav_file = root / "smali" / "z" / "au.smali"
+          nav = nav_file.read_text()
+          old_nav = "    filled-new-array {v6, v8, v10}, [Lz/wn0;\\n"
+          new_nav = "    filled-new-array {v6, v8}, [Lz/wn0;\\n"
+          assert nav.count(old_nav) == 1, "Could not uniquely locate bottom navigation item list"
+          nav_file.write_text(nav.replace(old_nav, new_nav, 1))
+          print("DARKVEN_SETTINGS_NAV_ITEM_REMOVED=PASS (no invisible tap target)")
+
           PY
           echo "=== metadata conversion ==="
           python3 - <<'PY'
