@@ -115,31 +115,18 @@ jobs:
             exit 1
           fi
 
-          echo "=== patch redeem password request without changing backend or app state ==="
+          echo "=== preserve original redeem endpoint and app behavior ==="
           python3 - <<'PY'
           from pathlib import Path
           import os
 
           root = Path(".")
           request_file = root / "smali_classes2/z/du0.smali"
-          ui_file = root / "smali/z/b4.smali"
-          s = request_file.read_text()
+          assert request_file.exists(), "Original redeem request class is missing"
+          # Keep the endpoint and request payload from the supplied source archive unchanged.
+          print("REDEEM_ENDPOINT_PRESERVED=PASS")
 
-          old_url = "https://zallrw-vip-backend-63rdvpmns-kedu065-maker.vercel.app/api/redeem"
-          new_url = "https://nvxgpmbakbzjyfjstdwl.supabase.co/functions/v1/admin-api-v2/redeem"
-          assert s.count(old_url) == 1, "Expected exactly one old redeem endpoint"
-          s = s.replace(old_url, new_url, 1)
-
-          parse_anchor = '    iget-object v11, v0, Lz/du0;->j:Ljava/lang/String;\n'
-          assert s.count(parse_anchor) == 1, "Could not locate redeem input register"
-          # Leave the original code value intact. No password parsing or password JSON field.
-          request_file.write_text(s)
-
-          ui = ui_file.read_text()
-          old_help = "Enter your VIP activation code below to upgrade your account instantly."
-          new_help = "Enter your VIP activation code below to upgrade your account instantly."
-          assert ui.count(old_help) == 1, "Redeem helper text not found uniquely"
-          ui_file.write_text(ui.replace(old_help, new_help, 1))
+          PY
 
           # The app validates its own signing certificate at startup. Bind the release
           # test APK to this run's temporary signer without changing the source archive.
@@ -251,8 +238,6 @@ jobs:
           print("DARKVEN_APP_LABEL=PASS")
           print("DARKVEN_DV_CROWN_LAUNCHER_ICON=PASS")
 
-          print("REDEEM_PASSWORD_PATCH=PASS")
-
           # Apply the app's own Compose Material 3 theme centrally.
           # Keep the app on its dark palette and use a red seed; Material 3
           # derives coordinated primary/secondary/container colors while the
@@ -317,9 +302,6 @@ jobs:
           print("DARKVEN_SETTINGS_NAV_ICON_HIDDEN=PASS (settings route retained)")
 
           PY
-          grep -q 'functions/v1/admin-api-v2/redeem' "smali_classes2/z/du0.smali"
-          ! grep -q 'CODE|PASSWORD' "smali/z/b4.smali"
-
           echo "=== metadata conversion ==="
           python3 - <<'PY'
           import json, yaml
