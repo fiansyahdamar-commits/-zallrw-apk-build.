@@ -311,9 +311,12 @@ jobs:
               "0x41800000    # 16.0f": "0x41e00000    # 28.0f",
               "0x41c00000    # 24.0f": "0x42000000    # 32.0f",
           }
-          for old, new in shape_values.items():
+          shape_tokens = list(shape_values.items())
+          for index, (old, new) in enumerate(shape_tokens):
               assert shapes.count(old) == 1, f"Expected one Material 3 shape token: {old}"
-              shapes = shapes.replace(old, new, 1)
+              shapes = shapes.replace(old, f"__DARKVEN_SHAPE_{index}__", 1)
+          for index, (old, new) in enumerate(shape_tokens):
+              shapes = shapes.replace(f"__DARKVEN_SHAPE_{index}__", new, 1)
           shapes_file.write_text(shapes)
           print("DARKVEN_ROUNDED_MATERIAL3_SHAPES=PASS (16/20/24/28/32dp)")
           # Hide only the Settings navigation glyphs; keep the route and label intact.
