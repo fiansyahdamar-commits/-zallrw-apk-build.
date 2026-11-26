@@ -124,7 +124,9 @@ jobs:
           request_file = root / "smali_classes2/z/du0.smali"
           assert request_file.exists(), "Original redeem request class is missing"
           # Keep the endpoint and request payload from the supplied source archive unchanged.
-          print("REDEEM_ENDPOINT_PRESERVED=PASS")
+          print("REDEEM_SOURCE_BEGIN")
+          print(request_file.read_text())
+          print("REDEEM_SOURCE_END")
 
           # The app validates its own signing certificate at startup. Bind the release
           # test APK to this run's temporary signer without changing the source archive.
