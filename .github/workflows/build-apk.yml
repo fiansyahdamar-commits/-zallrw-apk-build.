@@ -132,6 +132,14 @@ jobs:
           request_file.write_text(request_source.replace(old_endpoint, new_endpoint))
           print("REDEEM_ENDPOINT_PATCH=PASS")
           print("REDEEM_PASSWORD_FORMAT=CODE|PASSWORD")
+          hint_file = root / "smali_classes2/z/vu0.smali"
+          assert hint_file.exists(), "Redeem UI validation class is missing"
+          hint_source = hint_file.read_text()
+          old_hint = "Masukkan kode redeem terlebih dahulu"
+          new_hint = "Masukkan KODE|PASSWORD redeem terlebih dahulu"
+          assert hint_source.count(old_hint) == 1, "Redeem input hint did not match expected source"
+          hint_file.write_text(hint_source.replace(old_hint, new_hint))
+          print("REDEEM_INPUT_HINT_PATCH=PASS")
 
           # The app validates its own signing certificate at startup. Bind the release
           # test APK to this run's temporary signer without changing the source archive.
