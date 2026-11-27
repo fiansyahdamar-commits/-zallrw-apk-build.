@@ -123,20 +123,19 @@ jobs:
           root = Path(".")
           request_file = root / "smali_classes2/z/du0.smali"
           assert request_file.exists(), "Original redeem request class is missing"
-          # Route the existing one-field redeem UI to Admin V3. The API accepts
-          # CODE|PASSWORD in that field and still validates the separate password.
+          # Route the existing one-field redeem UI to Admin V3. Redeem is code-only; admin login stays separate.
           request_source = request_file.read_text()
           old_endpoint = "https://zallrw-vip-backend-63rdvpmns-kedu065-maker.vercel.app/api/redeem"
           new_endpoint = "https://vpcavoumahovwzeypxqa.supabase.co/functions/v1/admin-api/redeem"
           assert request_source.count(old_endpoint) == 1, "Original redeem endpoint did not match expected source"
           request_file.write_text(request_source.replace(old_endpoint, new_endpoint))
           print("REDEEM_ENDPOINT_PATCH=PASS")
-          print("REDEEM_PASSWORD_FORMAT=CODE|PASSWORD")
+          print("REDEEM_PASSWORD_FORMAT=CODE_ONLY")
           hint_file = root / "smali_classes2/z/vu0.smali"
           assert hint_file.exists(), "Redeem UI validation class is missing"
           hint_source = hint_file.read_text()
           old_hint = "Masukkan kode redeem terlebih dahulu"
-          new_hint = "Masukkan KODE|PASSWORD redeem terlebih dahulu"
+          new_hint = "Masukkan kode redeem terlebih dahulu"
           assert hint_source.count(old_hint) == 1, "Redeem input hint did not match expected source"
           hint_file.write_text(hint_source.replace(old_hint, new_hint))
           print("REDEEM_INPUT_HINT_PATCH=PASS")
