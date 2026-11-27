@@ -656,3 +656,11 @@ jobs:
             work/exit-call-sites.txt
           if-no-files-found: warn
           retention-days: 7
+      - name: Upload verified permanent APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZallRW-PERMANENT
+          path: work/ZallRW-PERMANENT.apk
+          if-no-files-found: error
+          retention-days: 30
