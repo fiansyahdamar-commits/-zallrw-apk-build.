@@ -332,6 +332,25 @@ jobs:
               shapes = shapes.replace(f"__DARKVEN_SHAPE_{index}__", new, 1)
           shapes_file.write_text(shapes)
           print("DARKVEN_ROUNDED_MATERIAL3_SHAPES=PASS (16/20/24/28/32dp)")
+          # Matte black surfaces: replace known opaque dark-grey Compose colors.
+          # Do not alter navigation, networking, or redeem logic.
+          matte_colors = {
+              "0xFF4B4545": "0xFF171717",
+              "0xFF494444": "0xFF171717",
+              "0xFF454141": "0xFF171717",
+              "0xFF121212": "0xFF080808",
+          }
+          changed = 0
+          for candidate in root.rglob("*.smali"):
+              content = candidate.read_text()
+              updated = content
+              for old, new in matte_colors.items():
+                  updated = updated.replace(old, new)
+              changed += content.count(old)
+              content = updated
+              if updated != candidate.read_text():
+                  candidate.write_text(updated)
+          print(f"DARKVEN_MATTE_BLACK_REPLACEMENTS={changed}")
           # Hide only the Settings navigation glyphs; keep the route and label intact.
           transparent_settings_icon = '''<?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
